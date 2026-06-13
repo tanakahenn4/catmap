@@ -271,6 +271,7 @@ function initMap() {
     if (arrow) {
       arrow.setAttribute('transform', `rotate(${-heading},25,25)`);
     }
+    updateMarkerIconSizes();
   });
 
   panorama.addListener("visible_changed", () => {
@@ -384,19 +385,32 @@ function setupFullscreenButton() {
   });
 }
 
-function getCatMarkerSize() {
+function getCatMarkerSize(jsonData = {}) {
   const width = window.innerWidth || document.documentElement.clientWidth || 1024;
-  const size = Math.round(Math.max(24, Math.min(40, width * 0.06)));
+  const baseSize = Math.max(24, Math.min(40, width * 0.06));
+  let zoomScale = 1;
+
+  if (panorama && panorama.getVisible()) {
+    const currentZoom = Number(panorama.getPov().zoom);
+    const registeredZoom = Number(jsonData.zoom);
+
+    if (Number.isFinite(currentZoom) && Number.isFinite(registeredZoom)) {
+      const zoomDelta = currentZoom - registeredZoom;
+      zoomScale = Math.pow(1.35, zoomDelta);
+    }
+  }
+
+  const size = Math.round(Math.max(18, Math.min(72, baseSize * zoomScale)));
   return new google.maps.Size(size, size);
 }
 
 function updateMarkerIconSizes() {
   if (!window.google || !google.maps) return;
 
-  const scaledSize = getCatMarkerSize();
   markers.forEach(marker => {
     const icon = marker.getIcon();
     if (!icon || typeof icon === "string") return;
+    const scaledSize = getCatMarkerSize(marker.jsonData);
     marker.setIcon({
       ...icon,
       scaledSize
@@ -411,7 +425,7 @@ function addMarker(jsonData, focus = false) {
     title: "🐈 猫発見！",
     icon: {
       url: "https://cdn-icons-png.flaticon.com/512/1864/1864514.png",
-      scaledSize: getCatMarkerSize()
+      scaledSize: getCatMarkerSize(jsonData)
     }
   });
   marker.jsonData = jsonData;
@@ -454,6 +468,7 @@ function showPanorama(data) {
     zoom: data.zoom
   });
   panorama.setVisible(true);
+  updateMarkerIconSizes();
 }
 
 async function saveMarkers() {
