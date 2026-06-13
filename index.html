@@ -404,17 +404,21 @@ function getCatMarkerSize(jsonData = {}) {
   return new google.maps.Size(size, size);
 }
 
+function getCatMarkerIcon(jsonData = {}) {
+  const scaledSize = getCatMarkerSize(jsonData);
+
+  return {
+    url: "https://cdn-icons-png.flaticon.com/512/1864/1864514.png",
+    scaledSize,
+    anchor: new google.maps.Point(scaledSize.width / 2, scaledSize.height)
+  };
+}
+
 function updateMarkerIconSizes() {
   if (!window.google || !google.maps) return;
 
   markers.forEach(marker => {
-    const icon = marker.getIcon();
-    if (!icon || typeof icon === "string") return;
-    const scaledSize = getCatMarkerSize(marker.jsonData);
-    marker.setIcon({
-      ...icon,
-      scaledSize
-    });
+    marker.setIcon(getCatMarkerIcon(marker.jsonData));
   });
 }
 
@@ -423,10 +427,7 @@ function addMarker(jsonData, focus = false) {
     position: { lat: jsonData.lat, lng: jsonData.lng },
     map: map,
     title: "🐈 猫発見！",
-    icon: {
-      url: "https://cdn-icons-png.flaticon.com/512/1864/1864514.png",
-      scaledSize: getCatMarkerSize(jsonData)
-    }
+    icon: getCatMarkerIcon(jsonData)
   });
   marker.jsonData = jsonData;
 
