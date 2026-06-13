@@ -387,7 +387,7 @@ function setupFullscreenButton() {
 
 function getCatMarkerSize(jsonData = {}) {
   const width = window.innerWidth || document.documentElement.clientWidth || 1024;
-  const baseSize = Math.max(36, Math.min(60, width * 0.08));
+  const baseSize = Math.max(50, Math.min(60, width * 0.1));
   let zoomScale = 1;
 
   if (panorama && panorama.getVisible()) {
@@ -400,7 +400,7 @@ function getCatMarkerSize(jsonData = {}) {
     }
   }
 
-  const size = Math.round(Math.max(32, Math.min(140, baseSize * zoomScale)));
+  const size = Math.round(Math.max(50, Math.min(200, baseSize * zoomScale)));
   return new google.maps.Size(size, size);
 }
 
