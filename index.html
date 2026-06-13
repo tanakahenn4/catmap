@@ -396,11 +396,11 @@ function getCatMarkerSize(jsonData = {}) {
 
     if (Number.isFinite(currentZoom) && Number.isFinite(registeredZoom)) {
       const zoomDelta = currentZoom - registeredZoom;
-      zoomScale = Math.pow(1.35, zoomDelta);
+      zoomScale = Math.pow(1.6, zoomDelta);
     }
   }
 
-  const size = Math.round(Math.max(18, Math.min(72, baseSize * zoomScale)));
+  const size = Math.round(Math.max(18, Math.min(96, baseSize * zoomScale)));
   return new google.maps.Size(size, size);
 }
 
