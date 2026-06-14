@@ -398,7 +398,7 @@ function getCatMarkerSize(jsonData = {}) {
 
     if (Number.isFinite(currentZoom) && Number.isFinite(registeredZoom)) {
       const zoomDelta = currentZoom - registeredZoom;
-      zoomScale = Math.pow(1.6, zoomDelta);
+      zoomScale = Math.pow(2.2, zoomDelta);
     }
 
     distanceScale = getCatDistanceScale(jsonData);
