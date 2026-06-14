@@ -398,13 +398,13 @@ function getCatMarkerSize(jsonData = {}) {
 
     if (Number.isFinite(currentZoom) && Number.isFinite(registeredZoom)) {
       const zoomDelta = currentZoom - registeredZoom;
-      zoomScale = Math.pow(1.6, zoomDelta);
+      zoomScale = Math.pow(1.5, zoomDelta);
     }
 
     distanceScale = getCatDistanceScale(jsonData);
   }
 
-  const size = Math.round(Math.max(32, Math.min(220, baseSize * zoomScale * distanceScale)));
+  const size = Math.round(Math.max(32, Math.min(360, baseSize * zoomScale * distanceScale)));
   return new google.maps.Size(size, size);
 }
 
