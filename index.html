@@ -392,7 +392,7 @@ function getCatMarkerSize(jsonData = {}) {
 
   if (panorama && panorama.getVisible()) {
     const currentZoom = Number(panorama.getPov().zoom);
-    const registeredZoom = Number(jsonData.zoom);
+    const registeredZoom = 1;
 
     if (Number.isFinite(currentZoom) && Number.isFinite(registeredZoom)) {
       const zoomDelta = currentZoom - registeredZoom;
