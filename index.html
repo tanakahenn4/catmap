@@ -419,8 +419,8 @@ function getCatDistanceScale(jsonData = {}) {
 
   if (!Number.isFinite(distance)) return 1;
 
-  const scale = Math.sqrt(20 / Math.max(distance, 1));
-  return Math.max(0.45, Math.min(3.9, scale));
+  const scale = Math.sqrt(28 / Math.max(distance, 1));
+  return Math.max(0.45, Math.min(5.9, scale));
 }
 
 function getDistanceMeters(a, b) {
