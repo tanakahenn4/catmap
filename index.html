@@ -398,8 +398,7 @@ function getCatMarkerSize(jsonData = {}) {
 
     if (Number.isFinite(currentZoom) && Number.isFinite(registeredZoom)) {
       const zoomDelta = currentZoom - registeredZoom;
-      const zoomBase = getCatZoomBase(jsonData);
-      zoomScale = Math.pow(zoomBase, zoomDelta);
+      zoomScale = Math.pow(1.5, zoomDelta);
     }
 
     distanceScale = getCatDistanceScale(jsonData);
@@ -422,21 +421,6 @@ function getCatDistanceScale(jsonData = {}) {
 
   const scale = Math.sqrt(28 / Math.max(distance, 1));
   return Math.max(0.45, Math.min(5.9, scale));
-}
-
-function getCatZoomBase(jsonData = {}) {
-  const pos = panorama && panorama.getPosition ? panorama.getPosition() : null;
-  if (!pos) return 1.5;
-
-  const distance = getDistanceMeters(
-    { lat: pos.lat(), lng: pos.lng() },
-    { lat: jsonData.lat, lng: jsonData.lng }
-  );
-
-  if (!Number.isFinite(distance)) return 1.5;
-
-  const nearAmount = Math.max(0, Math.min(1, (25 - distance) / 24));
-  return 1.2 + nearAmount * 0.9;
 }
 
 function getDistanceMeters(a, b) {
