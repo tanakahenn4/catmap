@@ -449,7 +449,10 @@ function getCatMarkerIcon(jsonData = {}) {
   return {
     url: "https://cdn-icons-png.flaticon.com/512/1864/1864514.png",
     scaledSize,
-    anchor: new google.maps.Point(scaledSize.width / 2, scaledSize.height)
+   anchor: new google.maps.Point(
+  scaledSize.width / 2,
+  scaledSize.height * 0.95
+)
   };
 }
 
