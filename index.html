@@ -290,6 +290,7 @@ function initMap() {
   panorama.addListener("position_changed", () => {
     const pos = panorama.getPosition();
     if (pos) lastPanoramaPos = { lat: pos.lat(), lng: pos.lng() };
+    updateMarkerIconSizes();
   });
 
   document.getElementById("getPosButton").addEventListener("click", () => {
@@ -389,6 +390,7 @@ function getCatMarkerSize(jsonData = {}) {
   const width = window.innerWidth || document.documentElement.clientWidth || 1024;
   const baseSize = Math.max(50, Math.min(60, width * 0.1));
   let zoomScale = 1;
+  let distanceScale = 1;
 
   if (panorama && panorama.getVisible()) {
     const currentZoom = Number(panorama.getPov().zoom);
@@ -398,10 +400,47 @@ function getCatMarkerSize(jsonData = {}) {
       const zoomDelta = currentZoom - registeredZoom;
       zoomScale = Math.pow(1.6, zoomDelta);
     }
+
+    distanceScale = getCatDistanceScale(jsonData);
   }
 
-  const size = Math.round(Math.max(50, Math.min(200, baseSize * zoomScale)));
+  const size = Math.round(Math.max(32, Math.min(220, baseSize * zoomScale * distanceScale)));
   return new google.maps.Size(size, size);
+}
+
+function getCatDistanceScale(jsonData = {}) {
+  const pos = panorama && panorama.getPosition ? panorama.getPosition() : null;
+  if (!pos) return 1;
+
+  const distance = getDistanceMeters(
+    { lat: pos.lat(), lng: pos.lng() },
+    { lat: jsonData.lat, lng: jsonData.lng }
+  );
+
+  if (!Number.isFinite(distance)) return 1;
+
+  const scale = Math.sqrt(8 / Math.max(distance, 1));
+  return Math.max(0.45, Math.min(1.9, scale));
+}
+
+function getDistanceMeters(a, b) {
+  const latA = Number(a.lat);
+  const lngA = Number(a.lng);
+  const latB = Number(b.lat);
+  const lngB = Number(b.lng);
+  if (![latA, lngA, latB, lngB].every(Number.isFinite)) return NaN;
+
+  const earthRadius = 6371000;
+  const toRad = value => value * Math.PI / 180;
+  const dLat = toRad(latB - latA);
+  const dLng = toRad(lngB - lngA);
+  const rLatA = toRad(latA);
+  const rLatB = toRad(latB);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(rLatA) * Math.cos(rLatB) * Math.sin(dLng / 2) ** 2;
+
+  return 2 * earthRadius * Math.asin(Math.sqrt(h));
 }
 
 function getCatMarkerIcon(jsonData = {}) {
