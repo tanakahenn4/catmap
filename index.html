@@ -1,592 +1,680 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>全国猫図鑑Nekomap</title>
-<style>
-  html, body {
-    height: 100%;
-    margin: 0;
-    padding: 0;
-    font-family: "Segoe UI", sans-serif;
-  }
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Emotional MIDI Piano Roll</title>
+  <style>
+    :root{
+      --bg:#071523;
+      --panel:rgba(7,18,30,.78);
+      --text:#f4d58a;
+      --muted:#b68b51;
+      --accent:#ffcc6e;
+      --line:#7c5832;
+      --note:#ffe2a2;
+      --warning:#ffd98a;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;min-height:100vh;color:var(--text);
+      font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;overflow:hidden;
+      background:
+        radial-gradient(circle at 18% 16%,rgba(255,197,104,.10),transparent 18%),
+        radial-gradient(circle at 78% 24%,rgba(255,158,92,.08),transparent 22%),
+        linear-gradient(180deg,#08121f 0%,#0b1a2a 52%,#050d17 100%);
+    }
+    #canvas{position:fixed;inset:0;width:100vw;height:100vh;display:block;}
+    .ui{
+      position:fixed;left:18px;top:18px;z-index:8;width:min(690px,calc(100vw - 96px));
+      color:rgba(255,213,138,.92);text-shadow:0 0 10px rgba(255,190,94,.28);
+    }
+    h1{display:none}
+    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .fileRow{gap:6px;margin-bottom:7px}
+    .transportBar{
+      position:relative;width:max-content;max-width:100%;padding:9px 12px 9px 24px;
+      background:linear-gradient(90deg,rgba(8,19,32,.82),rgba(8,19,32,.46),rgba(8,19,32,.16));
+      border-left:1px solid rgba(255,204,110,.62);
+      box-shadow:inset 0 1px 0 rgba(255,204,110,.12),0 14px 38px rgba(0,0,0,.28);
+      backdrop-filter:blur(5px);
+    }
+    .transportBar::before{
+      content:"✦";position:absolute;left:7px;top:50%;transform:translateY(-50%);
+      color:rgba(255,204,110,.94);font-size:13px;text-shadow:0 0 12px rgba(255,204,110,.52);
+    }
+    .hint{display:none}
+    .status{font-size:11px;color:rgba(244,213,138,.62);margin-top:7px;max-width:min(640px,calc(100vw - 96px));white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.35}
+    input[type=file]{max-width:155px;font-size:11px;color:rgba(244,213,138,.70)}
+    input[type=file]::file-selector-button{border:1px solid rgba(255,204,110,.42);background:rgba(8,19,32,.62);color:rgba(255,224,166,.88);padding:4px 8px;margin-right:7px;font:inherit;cursor:pointer}
+    button{
+      border:0;border-radius:0;padding:3px 8px;background:transparent;color:rgba(255,224,166,.84);
+      cursor:pointer;box-shadow:none;font:700 12px ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+      letter-spacing:0;text-shadow:0 0 12px rgba(255,190,94,.30);
+    }
+    button:hover{background:rgba(255,204,110,.12);color:rgba(255,239,198,.98);transform:none}
+    button.primary{background:rgba(255,204,110,.12);color:rgba(255,239,198,.98);font-weight:800}
+    .slider{display:flex;align-items:center;gap:7px;font-size:11px;color:rgba(244,213,138,.68)}
+    input[type=range]{width:98px;accent-color:#ffcc6e}
+    .badge{font-size:10px;color:rgba(244,213,138,.68);border:1px solid rgba(255,204,110,.32);border-radius:0;padding:2px 6px;background:rgba(8,19,32,.46)}
+    .dataChip{position:fixed;z-index:4;pointer-events:none;font-size:10px;color:rgba(255,204,110,.34);letter-spacing:.04em;text-shadow:0 0 8px rgba(255,204,110,.18)}
 
-  #app {
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    position: relative;
-    background: #000;
-  }
-
-  #app:fullscreen {
-    width: 100vw;
-    height: 100vh;
-  }
-
-  #map {
-    flex: 1;
-    min-height: 0;
-  }
-
-  #fullscreenButton {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    z-index: 1001;
-    width: 40px;
-    height: 40px;
-    padding: 0;
-    margin: 0;
-    border: 0;
-    border-radius: 2px;
-    background: rgba(0,0,0,0.55);
-    color: #fff;
-    font-size: 22px;
-    line-height: 40px;
-    cursor: pointer;
-  }
-
-  #fullscreenButton:hover {
-    background: rgba(0,0,0,0.75);
-  }
-
- #controls {
-    padding: 1px;
-    background: #444444;  /* 黒系ダーク */
-    border-top: 2px solid #ff44ef; /* 黒に近い境界線 */
-    color: #ffffff;  /* 文字を白に */
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    flex-wrap: wrap;
-    box-sizing: border-box;
-}
-
-#compass-container {
-  position: absolute;
-  bottom: 80px;
-  left: 10px;
-  z-index: 1000;
-  width: 50px;
-  height: 50px;
-}
-
-#controls input,
-#controls textarea,
-#controls button {
-    background: #333;  /* 入力欄やボタンも暗めに */
-    color: #fff;       /* 文字白 */
-    border: 1px solid #a7a5a5; /* 薄い境界線 */
-}
-
-#controls button:hover {
-    background: #555;  /* ホバーで少し明るく */
-}
-
-  button, input {
-    padding: 6px 10px;
-    margin-right: 5px;
-    font-size: 14px;
-  }
-  textarea {
-    width: 100%;
-    height: 80px;
-    margin-top: 5px;
-    font-family: monospace;
-  }
-
-  #controls > strong,
-#jsonInput,
-#searchJsonButton {
-  display: none;
-}
-
-@font-face {
-  font-family: 'PopRumCute';
-  src: url('PopRumCute.otf') format('opentype');
-  font-weight: normal;
-  font-style: normal;
-}
-
-#footer-label {
-  position: fixed;
-  left: 220px;
-  top: 11px;
-  color: #fff;               /* 文字色 */
-  background: rgba(0,0,0,0.5); /* 半透明黒背景 */
-  padding: 4px 8px;
-  border-radius: 8px;        /* 角丸 */
-  font-size: 20px;
-  
-  z-index: 1000;    
-  letter-spacing: 3px;         /* 地図やcontrolsより前面に表示 */
-}
-
-@media (max-width: 700px) {
-  #fullscreenButton {
-    width: 34px;
-    height: 34px;
-    font-size: 20px;
-    line-height: 34px;
-  }
-
-  #footer-label {
-    left: 50%;
-    top: 10px;
-    transform: translateX(-50%);
-    font-size: clamp(16px, 5vw, 24px);
-    letter-spacing: 2px;
-    white-space: nowrap;
-  }
-
-  #controls {
-    padding: 2px;
-    gap: 3px;
-    font-size: 12px;
-  }
-
-  #controls input,
-  #controls button {
-    height: 32px;
-    padding: 4px 8px;
-    margin-right: 0;
-    font-size: clamp(12px, 3.4vw, 16px);
-    box-sizing: border-box;
-  }
-
-  #addressInput {
-    flex: 1 1 180px;
-    min-width: 0;
-    width: auto !important;
-  }
-
-  #controls button {
-    flex: 0 0 auto;
-  }
-
-  #compass-container {
-    bottom: 92px;
-    width: 42px;
-    height: 42px;
-  }
-
-  #compass {
-    width: 42px;
-    height: 42px;
-  }
-}
-
-@media (max-width: 700px) and (orientation: portrait) {
-  #controls {
-    align-items: stretch;
-  }
-
-  #controls > div:first-child {
-    flex: 0 0 auto;
-  }
-
-  #addressInput {
-    flex-basis: calc(100% - 120px);
-  }
-}
-
-@media (max-width: 700px) and (orientation: landscape) {
-  #controls input,
-  #controls button {
-    height: 30px;
-    font-size: clamp(12px, 2vw, 15px);
-  }
-
-  #footer-label {
-    font-size: clamp(16px, 3vw, 22px);
-  }
-}
-
-
-</style>
+    .menuBtn{
+      position:fixed;right:18px;top:18px;z-index:10;padding:8px 11px;
+      background:rgba(8,19,32,.66);border-left:1px solid rgba(255,204,110,.58);
+      color:rgba(255,224,166,.88);backdrop-filter:blur(6px);
+      box-shadow:0 12px 36px rgba(0,0,0,.24);
+    }
+    .menuBtn::before{content:"✧ ";color:rgba(255,204,110,.88)}
+    .seekHud{
+      position:fixed;left:50%;bottom:42px;z-index:9;transform:translateX(-50%);
+      width:min(76vw,1320px);min-width:min(860px,calc(100vw - 96px));
+      display:grid;grid-template-columns:auto auto auto auto 1fr auto auto;gap:10px;align-items:center;
+      padding:8px 12px;background:linear-gradient(90deg,rgba(8,19,32,.08),rgba(8,19,32,.68),rgba(8,19,32,.08));
+      border-left:1px solid rgba(255,204,110,.50);border-right:1px solid rgba(255,204,110,.34);
+      box-shadow:0 12px 38px rgba(0,0,0,.22);backdrop-filter:blur(4px);
+    }
+    .seekHud::before,.seekHud::after{content:"✦";color:rgba(255,204,110,.72);font-size:12px;text-shadow:0 0 10px rgba(255,204,110,.42)}
+    .seekHud::before{position:absolute;left:-18px}
+    .seekHud::after{position:absolute;right:-18px}
+    .seekBtn{padding:4px 8px;color:rgba(255,224,166,.78)}
+    .playbackBtn{padding:4px 9px}
+    .seekRange{width:100%;accent-color:#ffcc6e}
+    .seekTime{min-width:92px;text-align:center;font-size:11px;color:rgba(244,213,138,.72);text-shadow:0 0 10px rgba(255,190,94,.26)}
+    @media (max-width:760px){
+      .seekHud{bottom:28px;width:calc(100vw - 36px);min-width:0;grid-template-columns:auto auto auto 1fr auto}
+      .seekTime{grid-column:1 / -1;min-width:0}
+    }
+    .settingsOverlay{position:fixed;inset:0;z-index:20;display:none;background:rgba(0,0,0,.50);backdrop-filter:blur(4px)}
+    .settingsDialog{position:absolute;right:24px;top:84px;width:min(420px,calc(100vw - 48px));background:rgba(8,19,32,.95);border:1px solid rgba(255,204,110,.48);border-radius:6px;padding:17px;box-shadow:0 22px 90px rgba(0,0,0,.44), inset 0 0 0 1px rgba(255,230,176,.06)}
+    .settingsDialog::before{content:"✦";position:absolute;right:42px;top:-11px;color:rgba(255,204,110,.86);font-size:20px;text-shadow:0 0 14px rgba(255,204,110,.48)}
+    .settingsHeader{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;color:rgba(255,224,166,.95);font-weight:800;letter-spacing:.06em}
+    .settingsClose{border-radius:0;padding:4px 9px;background:rgba(255,204,110,.12);color:var(--text);box-shadow:none}
+    .settingItem{display:grid;grid-template-columns:120px 1fr 64px;gap:10px;align-items:center;margin:10px 0;font-size:12px;color:rgba(244,213,138,.84)}
+    .settingItem input[type=range]{width:100%;accent-color:#ffcc6e}
+    .settingValue{text-align:right;color:rgba(255,239,198,.9)}
+    .settingsNote{margin-top:12px;font-size:11px;line-height:1.55;color:rgba(244,213,138,.56)}
+  </style>
 </head>
-
 <body>
-
-<div id="app">
-<div id="map"></div>
-<button id="fullscreenButton" type="button" title="全画面表示" aria-label="全画面表示">⛶</button>
-
-<div id="controls">
-  <div id="footer-label">全国猫図鑑  </div> 
-  <!-- JSON系を上に -->
-  <strong>登録データ(JSON):</strong>
-  <textarea id="jsonInput" placeholder='{"lat":35.681167,"lng":139.767052,"heading":120,"pitch":5,"zoom":1,"pano":"panoid"}'></textarea>
-  <button id="searchJsonButton">JSONから再現</button>
-  <!-- <br><br> -->
-  <!-- 住所入力系を下に -->
-  <input id="addressInput" type="text" placeholder="住所または pano ID を入力" style="width:40%">
-  <button id="searchAddressButton">住所 / Pano ID 検索</button>
-  <button id="getPosButton">現在位置を登録</button>
-  
-  <button id="loadDataButton">ページ更新</button>
+<canvas id="canvas"></canvas>
+<div class="ui">
+  <h1>Emotional MIDI Piano Roll</h1>
+  <div class="row fileRow"><input id="file" type="file" accept=".mid,.midi,.rmi,.kar,audio/midi" /><span id="name" class="badge">MIDI未読込</span></div>
+  <div class="row transportBar"><button id="mute">Sound ON</button><button id="recStart">● Rec</button><button id="recStop">■ Rec Stop</button><label class="slider">Play <input id="speed" type="range" min="0.25" max="2" step="0.05" value="1"><span id="speedText">1.00x</span></label><label class="slider">Flow <input id="visualSpeed" type="range" min="0.5" max="6" step="0.05" value="6"><span id="visualSpeedText">6.00x</span></label></div>
+  <div id="status" class="status">MIDIファイルを読み込むと、ノートONの瞬間に右寄りのラインへノート全体が出現し、左へ余韻として流れます。</div>
+  <div class="hint">ゆめかわ情報量追加版：ノート名・長さ・velocity・chを装飾HUD風に表示します。RIFF/RMID、ランニングステータス等にも少し対応。</div>
 </div>
-
-<div id="compass-container">
-  <svg id="compass" width="50" height="50" viewBox="0 0 50 50">
-    <!-- 外円 -->
-    <circle cx="25" cy="25" r="24" stroke="#fff" stroke-width="2" fill="rgba(0,0,0,0.5)" />
-    <!-- 赤い矢印（北） -->
-    <polygon id="compass-arrow" points="25,5 20,25 30,25" fill="red" />
-  </svg>
+<button id="menuBtn" class="menuBtn">☰ MENU</button>
+<div class="seekHud">
+  <button id="play" class="primary playbackBtn">▷ Play</button>
+  <button id="pause" class="playbackBtn">Ⅱ Pause</button>
+  <button id="stop" class="playbackBtn">■ Stop</button>
+  <button id="seekBack" class="seekBtn">-5s</button>
+  <input id="seekBar" class="seekRange" type="range" min="0" max="0" step="0.01" value="0">
+  <div id="seekTime" class="seekTime">0:00 / 0:00</div>
+  <button id="seekForward" class="seekBtn">+5s</button>
 </div>
+<div id="settingsOverlay" class="settingsOverlay">
+  <div class="settingsDialog">
+    <div class="settingsHeader">
+      <span>VISUAL SETTINGS</span>
+      <button id="settingsClose" class="settingsClose">×</button>
+    </div>
+    <label class="settingItem"><span>横位置</span><input id="visualOffset" type="range" min="-180" max="380" step="1" value="360"><span id="visualOffsetText" class="settingValue">360px</span></label>
+    <label class="settingItem"><span>ノート流速</span><input id="visualSpeedMenu" type="range" min="0.5" max="6" step="0.05" value="6"><span id="visualSpeedMenuText" class="settingValue">6.00x</span></label>
+    <label class="settingItem"><span>ノート太さ</span><input id="noteThickness" type="range" min="0.2" max="1.4" step="0.05" value="1"><span id="noteThicknessText" class="settingValue">1.00</span></label>
+    <label class="settingItem"><span>文字出現遅延</span><input id="labelDelay" type="range" min="0" max="0.8" step="0.01" value="0"><span id="labelDelayText" class="settingValue">0.00s</span></label>
+    <label class="settingItem"><span>文字消失位置</span><input id="labelCut" type="range" min="0.02" max="0.35" step="0.01" value="0.10"><span id="labelCutText" class="settingValue">10%</span></label>
+    <div class="settingsNote">横位置を右へ動かすと、ノート・文字列・NOTE ONラインがまとめて右へ移動します。文字消失位置は左端からの割合です。</div>
+  </div>
 </div>
-
-
 <script>
-let map, panorama, geocoder;
-let markers = [];
-let resetZoomOnEnter = true;
-const STORAGE_KEY = "catsmap_markers";
+(() => {
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const fileInput = document.getElementById('file');
+  const statusEl = document.getElementById('status');
+  const nameEl = document.getElementById('name');
+  const playBtn = document.getElementById('play');
+  const pauseBtn = document.getElementById('pause');
+  const stopBtn = document.getElementById('stop');
+  const muteBtn = document.getElementById('mute');
+  const recStartBtn = document.getElementById('recStart');
+  const recStopBtn = document.getElementById('recStop');
+  const speedInput = document.getElementById('speed');
+  const speedText = document.getElementById('speedText');
+  const visualSpeedInput = document.getElementById('visualSpeed');
+  const visualSpeedText = document.getElementById('visualSpeedText');
+  const seekBackBtn = document.getElementById('seekBack');
+  const seekForwardBtn = document.getElementById('seekForward');
+  const seekBar = document.getElementById('seekBar');
+  const seekTime = document.getElementById('seekTime');
+  const menuBtn = document.getElementById('menuBtn');
+  const settingsOverlay = document.getElementById('settingsOverlay');
+  const settingsClose = document.getElementById('settingsClose');
+  const visualOffsetInput = document.getElementById('visualOffset');
+  const visualOffsetText = document.getElementById('visualOffsetText');
+  const visualSpeedMenuInput = document.getElementById('visualSpeedMenu');
+  const visualSpeedMenuText = document.getElementById('visualSpeedMenuText');
+  const noteThicknessInput = document.getElementById('noteThickness');
+  const noteThicknessText = document.getElementById('noteThicknessText');
+  const labelDelayInput = document.getElementById('labelDelay');
+  const labelDelayText = document.getElementById('labelDelayText');
+  const labelCutInput = document.getElementById('labelCut');
+  const labelCutText = document.getElementById('labelCutText');
 
+  let W=0,H=0,dpr=1;
+  function resize(){dpr=Math.min(2,devicePixelRatio||1);W=innerWidth;H=innerHeight;canvas.width=W*dpr;canvas.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);} addEventListener('resize',resize); resize();
 
+  let notes=[], noteEvents=[], duration=0, minNote=21, maxNote=108, title='';
+  let playing=false, muted=false, seeking=false, speed=1, visualSpeed=6, visualOffset=360, noteThickness=1, labelDelay=0, labelCutRatio=0.10, startWall=0, startSong=0, songTime=0, scheduledIndex=0, activeOsc=[];
+  let audioCtx=null;
+  let mediaRecorder=null, videoChunks=[], recordingVideo=false, recordDest=null;
 
-let lastPanoramaPos = { lat: 35.6812, lng: 139.7671 }; // 初期中心（東京駅）
-
-function initMap() {
-  const initialCenter = { lat: 35.6812, lng: 139.7671 };
-  map = new google.maps.Map(document.getElementById("map"), {
-    center: initialCenter,
-    zoom: 7,
-    fullscreenControl: false
-  });
-  panorama = map.getStreetView();
-  panorama.setOptions({ fullscreenControl: false });
-  panorama.setVisible(false);
-  geocoder = new google.maps.Geocoder();
-
-  loadSavedMarkers();
-  setupFullscreenButton();
-
-    panorama.addListener('pov_changed', () => {
-    const heading = panorama.getPov().heading;
-    const arrow = document.getElementById('compass-arrow');
-    if (arrow) {
-      arrow.setAttribute('transform', `rotate(${-heading},25,25)`);
+  class Reader{
+    constructor(buf, start=0, end=null){this.d=new DataView(buf);this.buf=buf;this.p=start;this.end=end ?? buf.byteLength;}
+    get len(){return this.end;} get eof(){return this.p>=this.end;} left(){return Math.max(0,this.end-this.p);} seek(p){this.p=Math.max(0,Math.min(this.end,p));}
+    u8(){if(this.p>=this.end) throw new Error('予期せぬEOF'); return this.d.getUint8(this.p++);} 
+    u16(){if(this.p+2>this.end) throw new Error('予期せぬEOF'); const v=this.d.getUint16(this.p,false);this.p+=2;return v;}
+    i8(){let v=this.u8(); return v>127?v-256:v;}
+    u32(){if(this.p+4>this.end) throw new Error('予期せぬEOF'); const v=this.d.getUint32(this.p,false);this.p+=4;return v;}
+    str(n){let s=''; for(let i=0;i<n&&this.p<this.end;i++) s+=String.fromCharCode(this.u8()); return s;}
+    var(){let v=0,b,count=0; do{b=this.u8(); v=(v<<7)|(b&127); if(++count>4) break;}while(b&128); return v;}
+    bytes(n){const a=[]; for(let i=0;i<n&&this.p<this.end;i++) a.push(this.u8()); return a;}
+    skip(n){this.seek(this.p+n);} peekStr(n){const old=this.p; const s=this.str(n); this.p=old; return s;}
+  }
+  function bytesToStr(dv, off, n){let s=''; for(let i=0;i<n && off+i<dv.byteLength;i++) s+=String.fromCharCode(dv.getUint8(off+i)); return s;}
+  function findAscii(dv, text, start=0, end=dv.byteLength){
+    const codes=[...text].map(c=>c.charCodeAt(0)); outer: for(let i=start;i<=end-codes.length;i++){for(let j=0;j<codes.length;j++) if(dv.getUint8(i+j)!==codes[j]) continue outer; return i;} return -1;
+  }
+  function locateMidiHeader(buf){
+    const dv=new DataView(buf);
+    if(bytesToStr(dv,0,4)==='MThd') return {start:0, note:'SMF'};
+    if(bytesToStr(dv,0,4)==='RIFF'){
+      const m=findAscii(dv,'MThd',0); if(m>=0) return {start:m, note:'RIFF/RMID内のMThdを検出'};
     }
-    updateMarkerIconSizes();
-  });
-
-  panorama.addListener("visible_changed", () => {
-    if (panorama.getVisible()) {
-   if (resetZoomOnEnter) {
-    panorama.setPov({ heading: 0, pitch: 0, zoom: 1 });
-}
-    } else {
-      const center = lastPanoramaPos;
-      map.setCenter(center);
-      map.setZoom(20);
-      resetZoomOnEnter = true;
+    const m=findAscii(dv,'MThd',0); if(m>=0) return {start:m, note:'先頭以外のMThdを検出'};
+    throw new Error('MIDIヘッダ MThd が見つかりません');
+  }
+  function divisionInfo(division){
+    if(!(division&0x8000)) return {type:'ppq', ppq:division};
+    let fpsByte=(division>>8)&0xff; if(fpsByte>127) fpsByte-=256;
+    let fps=Math.abs(fpsByte); if(fps===29) fps=29.97;
+    const ticksPerFrame=division&0xff;
+    return {type:'smpte', fps, ticksPerFrame, secondsPerTick:1/(fps*ticksPerFrame)};
+  }
+  function finalizeTempos(tempos, div){
+    if(div.type!=='ppq') return;
+    tempos.sort((a,b)=>a.tick-b.tick);
+    if(!tempos.length||tempos[0].tick!==0) tempos.unshift({tick:0,usPerQuarter:500000});
+    tempos[0].sec=0;
+    for(let i=1;i<tempos.length;i++){const prev=tempos[i-1]; tempos[i].sec=prev.sec+(tempos[i].tick-prev.tick)*prev.usPerQuarter/1000000/div.ppq;}
+  }
+  function ticksToSec(tick, div, tempos){
+    if(div.type==='smpte') return tick*div.secondsPerTick;
+    let cur=tempos[0]; for(let i=1;i<tempos.length;i++){if(tempos[i].tick>tick) break; cur=tempos[i];}
+    return cur.sec + (tick-cur.tick)*cur.usPerQuarter/1000000/div.ppq;
+  }
+  function decodeText(bytes){
+    try{return new TextDecoder('utf-8').decode(new Uint8Array(bytes)).replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g,'').trim();}
+    catch{return String.fromCharCode(...bytes).replace(/[\x00-\x1f]/g,'').trim();}
+  }
+  function readTrackChunk(reader, fileEnd){
+    while(reader.p+8<=fileEnd){
+      const tag=reader.str(4); const len=reader.u32(); const start=reader.p; const end=Math.min(fileEnd, start+len);
+      if(tag==='MTrk') return {start, end, declaredLen:len};
+      reader.seek(end);
     }
-  });
-
-  panorama.addListener("position_changed", () => {
-    const pos = panorama.getPosition();
-    if (pos) lastPanoramaPos = { lat: pos.lat(), lng: pos.lng() };
-    updateMarkerIconSizes();
-  });
-
-  document.getElementById("getPosButton").addEventListener("click", () => {
-    if (!panorama.getVisible()) return alert("ストリートビューが表示されていません。");
-    const pos = panorama.getPosition();
-    const pov = panorama.getPov();
-    const panoId = panorama.getPano();
-    const jsonData = {
-      lat: pos.lat(),
-      lng: pos.lng(),
-      heading: pov.heading,
-      pitch: pov.pitch,
-      zoom: pov.zoom,
-      pano: panoId
-    };
-    addMarker(jsonData, true);
-    saveMarkers();
-  });
-
-  document.getElementById("searchAddressButton").addEventListener("click", async () => {
-    const input = document.getElementById("addressInput").value.trim();
-    if (!input) return alert("住所または pano ID を入力してください。");
-
-    try {
-      const result = await geocoder.geocode({ address: input });
-      if (result.results && result.results.length > 0) {
-        const loc = result.results[0].geometry.location;
-        map.setCenter(loc);
-        panorama.setPosition(loc);
-        panorama.setPov({ heading: 0, pitch: 0, zoom: 1 });
-        panorama.setVisible(true);
-        return;
+    return null;
+  }
+  function parseTrack(buf, trStart, trEnd, raw, tempos, names, warnings){
+    const tr=new Reader(buf,trStart,trEnd); let tick=0, running=0;
+    while(tr.p<trEnd){
+      let delta; try{delta=tr.var();}catch{warnings.push('トラック末尾のデルタタイムが途中で終了'); break;}
+      tick += delta;
+      if(tr.p>=trEnd) break;
+      let status=tr.u8();
+      if(status<0x80){
+        if(!running){warnings.push('ランニングステータスなしのデータバイトをスキップ'); continue;}
+        tr.p--; status=running;
+      } else if(status<0xf0) {
+        running=status;
+      } else if(status===0xf0 || status===0xf7 || status===0xff) {
+        // system/meta はrunning statusを更新しない
       }
-    } catch (e) {
-      console.warn("住所検索エラー:", e);
+      try{
+        if(status===0xff){
+          const type=tr.u8(); const len=tr.var(); const payloadEnd=Math.min(trEnd,tr.p+len);
+          const bytes=tr.bytes(payloadEnd-tr.p);
+          if(type===0x51 && bytes.length>=3){tempos.push({tick,usPerQuarter:(bytes[0]<<16)|(bytes[1]<<8)|bytes[2]});}
+          else if((type===0x03||type===0x01||type===0x04) && bytes.length){const t=decodeText(bytes); if(t) names.push(t);}
+          tr.seek(payloadEnd);
+          if(type===0x2f) break;
+        } else if(status===0xf0 || status===0xf7){
+          const len=tr.var(); tr.skip(len);
+        } else {
+          const cmd=status>>4, ch=status&15;
+          if(cmd<0x8 || cmd>0xe){warnings.push('未対応ステータス 0x'+status.toString(16)); continue;}
+          const a=tr.u8(); let b=null; if(cmd!==0xc && cmd!==0xd) b=tr.u8();
+          if(cmd===0x9 && b>0) raw.push({tick,type:'on',note:a,vel:b,ch});
+          else if(cmd===0x8 || (cmd===0x9 && b===0)) raw.push({tick,type:'off',note:a,vel:b||0,ch});
+        }
+      }catch(e){warnings.push('トラック解析中断: '+e.message); break;}
     }
+  }
 
-    panorama.setPano(input);
-    panorama.setPov({ heading: 0, pitch: 0, zoom: 1 });
-    panorama.setVisible(true);
-  });
-
-  document.getElementById("searchJsonButton").addEventListener("click", () => {
-    try {
-      const data = JSON.parse(document.getElementById("jsonInput").value);
-      if (!data.lat || !data.lng) return alert("JSONに必要な情報がありません。");
-      showPanorama(data);
-    } catch {
-      alert("正しいJSONを入力してください。");
+  function parseMidi(buf){
+    const loc=locateMidiHeader(buf); const dv=new DataView(buf); const r=new Reader(buf,loc.start);
+    if(r.str(4)!=='MThd') throw new Error('MIDIヘッダが読めません');
+    const hlen=r.u32(); if(hlen<6) throw new Error('MIDIヘッダ長が短すぎます');
+    const format=r.u16(); const ntrks=r.u16(); const division=r.u16(); r.skip(hlen-6);
+    const div=divisionInfo(division); const raw=[], tempos=[], names=[], warnings=[];
+    if(format===2) warnings.push('Type 2 MIDIです。複数曲扱いのためタイミングが意図と違う場合があります');
+    if(div.type==='smpte') warnings.push(`SMPTE divisionとして読み込み: ${div.fps}fps x ${div.ticksPerFrame}`);
+    let tracksRead=0;
+    while(r.p+8<=buf.byteLength && (tracksRead<ntrks || ntrks===0)){
+      const chunk=readTrackChunk(r, buf.byteLength); if(!chunk) break;
+      parseTrack(buf,chunk.start,chunk.end,raw,tempos,names,warnings); tracksRead++;
+      r.seek(chunk.end);
     }
-  });
-
-  document.getElementById("loadDataButton").addEventListener("click", () => {
-    markers.forEach(m => m.setMap(null));
-    markers = [];
-    loadSavedMarkers();
-  });
-
-  window.addEventListener("resize", () => {
-    updateMarkerIconSizes();
-  });
-}
-
-function setupFullscreenButton() {
-  const app = document.getElementById("app");
-  const button = document.getElementById("fullscreenButton");
-  if (!app || !button) return;
-
-  button.addEventListener("click", async () => {
-    try {
-      if (document.fullscreenElement === app) {
-        await document.exitFullscreen();
+    // ヘッダのトラック数が壊れている/チャンク順が変でもMTrkを追加で探す
+    while(r.p+8<=buf.byteLength){
+      const pos=findAscii(dv,'MTrk',r.p); if(pos<0 || pos+8>buf.byteLength) break;
+      r.seek(pos+4); const len=r.u32(); const start=r.p, end=Math.min(buf.byteLength,start+len);
+      parseTrack(buf,start,end,raw,tempos,names,warnings); tracksRead++; r.seek(end);
+    }
+    if(!tracksRead) throw new Error('MTrkトラックが見つかりません');
+    finalizeTempos(tempos,div);
+    raw.sort((a,b)=>a.tick-b.tick || (a.type==='off'?-1:1));
+    const open=new Map(), out=[], events=[];
+    for(const ev of raw){
+      const t=ticksToSec(ev.tick,div,tempos); const key=ev.ch+':'+ev.note;
+      if(ev.type==='on'){
+        const o={note:ev.note, ch:ev.ch, vel:ev.vel, start:t};
+        if(!open.has(key)) open.set(key,[]); open.get(key).push(o); events.push({...ev,time:t});
       } else {
-        await app.requestFullscreen();
-      }
-    } catch (e) {
-      console.warn("全画面表示の切り替えに失敗しました:", e);
-    }
-  });
-
-  document.addEventListener("fullscreenchange", () => {
-    const isFullscreen = document.fullscreenElement === app;
-    button.textContent = isFullscreen ? "×" : "⛶";
-    button.title = isFullscreen ? "全画面を終了" : "全画面表示";
-    button.setAttribute("aria-label", button.title);
-
-    setTimeout(() => {
-      const center = map && map.getCenter ? map.getCenter() : null;
-      if (map) google.maps.event.trigger(map, "resize");
-      if (center) map.setCenter(center);
-      updateMarkerIconSizes();
-    }, 100);
-  });
-}
-
-function getCatMarkerSize(jsonData = {}) {
-  const width = window.innerWidth || document.documentElement.clientWidth || 1024;
-  const baseSize = Math.max(50, Math.min(60, width * 0.1));
-  let zoomScale = 1;
-  let distanceScale = 1;
-
-  if (panorama && panorama.getVisible()) {
-    const currentZoom = Number(panorama.getPov().zoom);
-    const registeredZoom = 1;
-
-    if (Number.isFinite(currentZoom) && Number.isFinite(registeredZoom)) {
-      const zoomDelta = currentZoom - registeredZoom;
-      zoomScale = Math.pow(1.5, zoomDelta);
-    }
-
-    distanceScale = getCatDistanceScale(jsonData);
-  }
-
-  const size = Math.round(Math.max(32, Math.min(360, baseSize * zoomScale * distanceScale)));
-  return new google.maps.Size(size, size);
-}
-
-function getCatDistanceScale(jsonData = {}) {
-  const pos = panorama && panorama.getPosition ? panorama.getPosition() : null;
-  if (!pos) return 1;
-
-  const distance = getDistanceMeters(
-    { lat: pos.lat(), lng: pos.lng() },
-    { lat: jsonData.lat, lng: jsonData.lng }
-  );
-
-  if (!Number.isFinite(distance)) return 1;
-
-  const scale = Math.sqrt(28 / Math.max(distance, 1));
-  return Math.max(0.45, Math.min(5.9, scale));
-}
-
-function getDistanceMeters(a, b) {
-  const latA = Number(a.lat);
-  const lngA = Number(a.lng);
-  const latB = Number(b.lat);
-  const lngB = Number(b.lng);
-  if (![latA, lngA, latB, lngB].every(Number.isFinite)) return NaN;
-
-  const earthRadius = 6371000;
-  const toRad = value => value * Math.PI / 180;
-  const dLat = toRad(latB - latA);
-  const dLng = toRad(lngB - lngA);
-  const rLatA = toRad(latA);
-  const rLatB = toRad(latB);
-  const h =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(rLatA) * Math.cos(rLatB) * Math.sin(dLng / 2) ** 2;
-
-  return 2 * earthRadius * Math.asin(Math.sqrt(h));
-}
-
-function getCatMarkerIcon(jsonData = {}) {
-  const scaledSize = getCatMarkerSize(jsonData);
-
-  return {
-    url: "https://cdn-icons-png.flaticon.com/512/1864/1864514.png",
-    scaledSize,
-   anchor: new google.maps.Point(
-  scaledSize.width / 2,
-  scaledSize.height * 0.95
-)
-  };
-}
-
-function updateMarkerIconSizes() {
-  if (!window.google || !google.maps) return;
-
-  markers.forEach(marker => {
-    marker.setIcon(getCatMarkerIcon(marker.jsonData));
-  });
-}
-
-function addMarker(jsonData, focus = false) {
-  const marker = new google.maps.Marker({
-    position: { lat: jsonData.lat, lng: jsonData.lng },
-    map: map,
-    title: "🐈 猫発見！",
-    icon: getCatMarkerIcon(jsonData)
-  });
-  marker.jsonData = jsonData;
-
-  // 🐾 クリックイベントで判定
- const meowSound = new Audio('meow.mp3'); // 同じフォルダに置いた音声ファイル
-
-marker.addListener("click", (e) => {
-  if (e.domEvent.shiftKey) {
-    if (confirm("この猫マーカーを削除しますか？🐈")) {
-      if (confirm("本当に削除しますか？🙀")) {
-        marker.setMap(null);
-        markers = markers.filter(m => m !== marker);
-        saveMarkers();
+        const arr=open.get(key); if(arr&&arr.length){const o=arr.shift(); o.end=Math.max(t,o.start+0.04); out.push(o);} events.push({...ev,time:t});
       }
     }
-  } else {
-    // 普通のクリック → ストリートビュー
-    showPanorama(jsonData);
-
-    // 猫の鳴き声再生
-    meowSound.currentTime = 0; // 何度もクリックできるように先頭に戻す
-    meowSound.play();
+    const last=raw.length?ticksToSec(raw[raw.length-1].tick,div,tempos):0;
+    for(const arr of open.values()) for(const o of arr){o.end=Math.max(last,o.start+.2); out.push(o);} 
+    out.sort((a,b)=>a.start-b.start); events.sort((a,b)=>a.time-b.time);
+    return {format,ntrks,tracksRead,division:div,notes:out,events,duration:Math.max(last,...out.map(n=>n.end),0),title:names.find(Boolean)||'', warnings, locNote:loc.note};
   }
-});
+
+  function freq(note){return 440*Math.pow(2,(note-69)/12)}
+  function ensureAudio(){if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)(); return audioCtx;}
+  function synth(note, vel, when, dur){ if(muted) return; const ac=ensureAudio(); const o=ac.createOscillator(); const g=ac.createGain(); const f=ac.createBiquadFilter(); o.type='triangle'; o.frequency.value=freq(note); f.type='lowpass'; f.frequency.value=2400; g.gain.setValueAtTime(0,when); const amp=Math.min(.22,(vel/127)*.18+.025); g.gain.linearRampToValueAtTime(amp,when+.018); g.gain.exponentialRampToValueAtTime(Math.max(.0001,amp*.35),when+Math.min(.4,dur*.45)); g.gain.exponentialRampToValueAtTime(.0001,when+dur+.25); o.connect(f); f.connect(g); g.connect(ac.destination); if(recordDest) g.connect(recordDest); o.start(when); o.stop(when+dur+.35); activeOsc.push(o); o.onended=()=>{activeOsc=activeOsc.filter(x=>x!==o)}}
+  function stopActiveNotes(){activeOsc.forEach(o=>{try{o.stop()}catch{}}); activeOsc=[];}
+  function resetScheduleFrom(time){scheduledIndex=notes.findIndex(n=>n.start>=time-.1); if(scheduledIndex<0)scheduledIndex=notes.length;}
+  function currentTime(){return playing ? startSong + (performance.now()-startWall)/1000*speed : songTime;}
+  function schedule(){if(!playing||muted) return; const ac=ensureAudio(); const nowSong=currentTime(); const horizon=nowSong+.35*speed; while(scheduledIndex<notes.length && notes[scheduledIndex].start<horizon){const n=notes[scheduledIndex++]; if(n.end>=nowSong-.05){const when=ac.currentTime + Math.max(0,(n.start-nowSong)/speed); synth(n.note,n.vel,when,Math.max(.04,(n.end-n.start)/speed));}}}
+  function play(){if(!notes.length)return; ensureAudio().resume(); playing=true; startSong=songTime; startWall=performance.now(); resetScheduleFrom(songTime);}
+  function pause(){songTime=currentTime(); playing=false; stopActiveNotes(); syncSeekUI();}
+  function seekTo(time){songTime=Math.max(0,Math.min(duration||0,time||0)); stopActiveNotes(); resetScheduleFrom(songTime); if(playing){startSong=songTime; startWall=performance.now();} syncSeekUI();}
+  function skipBy(delta){seekTo(currentTime()+delta);}
+  function stop(){pause();seekTo(0);}
 
 
-
-  markers.push(marker);
-  if (focus) map.setCenter(marker.getPosition());
-}
-
-function showPanorama(data) {
-  resetZoomOnEnter = false;
-  if (data.pano) panorama.setPano(data.pano);
-  else panorama.setPosition({ lat: data.lat, lng: data.lng });
-  panorama.setPov({
-    heading: data.heading,
-    pitch: data.pitch,
-    zoom: data.zoom
-  });
-  panorama.setVisible(true);
-  updateMarkerIconSizes();
-}
-
-async function saveMarkers() {
-  const data = markers.map(m => m.jsonData);
-
-  await window.firebaseSetDoc(
-    window.firebaseDoc(window.firebaseDB, "catsmap", "markers"),
-    {
-      items: data,
-      updatedAt: new Date().toISOString()
+  function pickMimeType(){
+    const types = [
+      'video/webm;codecs=vp9,opus',
+      'video/webm;codecs=vp8,opus',
+      'video/webm;codecs=vp9',
+      'video/webm;codecs=vp8',
+      'video/webm'
+    ];
+    return types.find(t => window.MediaRecorder && MediaRecorder.isTypeSupported(t)) || '';
+  }
+  function startVideoRecording(){
+    if(recordingVideo) return;
+    if(!canvas.captureStream || !window.MediaRecorder){
+      statusEl.textContent = 'このブラウザは動画録画に対応していません。Chrome / Edge推奨です。';
+      return;
     }
-  );
-
-  console.log("✅ Firestore保存完了", data);
-}
-
-async function loadSavedMarkers() {
-  // Firebaseの準備待ち
-  while (!window.firebaseDB || !window.firebaseGetDoc || !window.firebaseDoc) {
-    console.log("⏳ Firebase準備待ち...");
-    await new Promise(resolve => setTimeout(resolve, 100));
+    try{
+      const ac = ensureAudio();
+      ac.resume();
+      recordDest = ac.createMediaStreamDestination();
+      const stream = canvas.captureStream(60);
+      for(const track of recordDest.stream.getAudioTracks()) stream.addTrack(track);
+      const mimeType = pickMimeType();
+      mediaRecorder = new MediaRecorder(stream, mimeType ? {mimeType} : undefined);
+      videoChunks = [];
+      mediaRecorder.ondataavailable = e => { if(e.data && e.data.size) videoChunks.push(e.data); };
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(videoChunks, {type: mediaRecorder.mimeType || 'video/webm'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `midi-pianoroll-${new Date().toISOString().replace(/[:.]/g,'-')}.webm`;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+        stream.getTracks().forEach(tr => tr.stop());
+        recordDest = null;
+        recordingVideo = false;
+        statusEl.textContent = `録画保存完了: ${(blob.size/1024/1024).toFixed(2)} MB / WebM`;
+      };
+      mediaRecorder.start(1000);
+      recordingVideo = true;
+      statusEl.textContent = '録画中: 再生すると映像と簡易音源がWebMに保存されます。停止でダウンロードします。';
+    }catch(e){
+      console.error(e);
+      statusEl.textContent = '録画開始失敗: ' + e.message;
+      recordDest = null;
+      recordingVideo = false;
+    }
+  }
+  function stopVideoRecording(){
+    if(mediaRecorder && recordingVideo && mediaRecorder.state !== 'inactive'){
+      mediaRecorder.stop();
+      statusEl.textContent = '録画停止処理中…';
+    }
   }
 
-  const snap = await window.firebaseGetDoc(
-    window.firebaseDoc(window.firebaseDB, "catsmap", "markers")
-  );
+  function colorFor(note,vel,alpha=1){
+    const v = Math.min(1, Math.max(.35, (vel||72)/127));
+    const r = Math.round(210 + 42*v);
+    const g = Math.round(154 + 54*v);
+    const b = Math.round(72 + 42*v);
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+  function y(note){const scopeH=Math.min(H,W/2.39); const top=Math.max(0,(H-scopeH)/2); return top+scopeH-55-((note-minNote)/(maxNote-minNote||1))*(scopeH-110)}
+  function noteName(num){const nm=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B']; return nm[num%12]+(Math.floor(num/12)-1)}
+  function durText(sec){return sec<1 ? Math.round(sec*1000)+'ms' : sec.toFixed(2)+'s'}
+  function drawStar(x,y,r,a,points=4){ctx.save();ctx.translate(x,y);ctx.fillStyle=`rgba(255,204,110,${a})`;ctx.shadowColor=`rgba(255,204,110,${a*.55})`;ctx.shadowBlur=r*.9;ctx.beginPath();for(let i=0;i<points*2;i++){const ang=-Math.PI/2+i*Math.PI/points;const rr=i%2===0?r:r*.22;const px=Math.cos(ang)*rr,py=Math.sin(ang)*rr;if(i===0)ctx.moveTo(px,py);else ctx.lineTo(px,py);}ctx.closePath();ctx.fill();ctx.restore();}
+  function drawStarfield(barH,scopeH,t){
+    ctx.save();ctx.beginPath();ctx.rect(0,barH,W,scopeH);ctx.clip();
+    const stars=[
+      [.10,.18,34,4,.15], [.19,.66,12,4,.11], [.35,.22,24,4,.13], [.53,.72,18,8,.10],
+      [.71,.25,30,8,.12], [.83,.64,15,4,.10], [.91,.18,10,4,.12], [.27,.44,7,4,.09]
+    ];
+    for(const [sx,sy,r,p,a] of stars){
+      const twinkle=.72+Math.sin(t*.9+sx*18+sy*11)*.18;
+      drawStar(W*sx,barH+scopeH*sy,r,a*twinkle,p);
+    }
+    ctx.restore();
+  }
+  function drawPanel(x,y,w,h,title,lines,alpha=.42){
+    ctx.save();ctx.globalAlpha=alpha;ctx.fillStyle='rgba(8,19,32,.78)';ctx.strokeStyle='rgba(255,204,110,.28)';ctx.lineWidth=1;roundRect(ctx,x,y,w,h,3);ctx.fill();ctx.stroke();ctx.globalAlpha=1;
+    ctx.fillStyle='rgba(255,204,110,.90)';ctx.font='700 10px ui-monospace, SFMono-Regular, Menlo, monospace';ctx.fillText('✦ '+title,x+12,y+17);
+    ctx.fillStyle='rgba(244,213,138,.72)';ctx.font='10px ui-monospace, SFMono-Regular, Menlo, monospace';
+    lines.forEach((line,i)=>ctx.fillText(line,x+12,y+35+i*14));ctx.restore();
+  }
+  function drawActiveNotesPanel(x,y,w,h,t){
+    const activeNotes = notes
+      .filter(n => n.start <= t && n.end > t)
+      .sort((a,b) => a.note - b.note);
+    const byCh = new Map();
+    for(const n of activeNotes){
+      if(!byCh.has(n.ch)) byCh.set(n.ch, []);
+      byCh.get(n.ch).push(n);
+    }
 
-  if (!snap.exists()) {
-    console.log("🐾 Firestoreに保存データはまだありません");
-    return;
+    ctx.save();
+    ctx.fillStyle='rgba(8,19,32,.70)';
+    ctx.strokeStyle='rgba(255,204,110,.30)';
+    ctx.lineWidth=1;
+    roundRect(ctx,x,y,w,h,4);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle='rgba(255,204,110,.90)';
+    ctx.font='700 10px ui-monospace, SFMono-Regular, Menlo, monospace';
+    ctx.fillText('ACTIVE NOTES', x+12, y+17);
+
+    ctx.fillStyle='rgba(244,213,138,.70)';
+    ctx.font='10px ui-monospace, SFMono-Regular, Menlo, monospace';
+    ctx.fillText(`POLY:${String(activeNotes.length).padStart(2,'0')}  RANGE:${activeNotes.length ? noteName(activeNotes[0].note)+'-'+noteName(activeNotes[activeNotes.length-1].note) : '--'}`, x+12, y+34);
+
+    if(!activeNotes.length){
+      ctx.fillStyle='rgba(244,213,138,.40)';
+      ctx.fillText('no sustained signal', x+12, y+56);
+      ctx.restore();
+      return;
+    }
+
+    let yy = y + 55;
+    for(const [ch, list] of byCh){
+      const names = list.map(n => noteName(n.note)).join('  ');
+      const avgVel = Math.round(list.reduce((a,n)=>a+n.vel,0) / list.length);
+      ctx.fillStyle='rgba(255,204,110,.82)';
+      ctx.fillText(`CH${String(ch+1).padStart(2,'0')}  V:${String(avgVel).padStart(3,'0')}`, x+12, yy);
+      ctx.fillStyle='rgba(255,239,198,.88)';
+      ctx.fillText(names.slice(0, 29), x+92, yy);
+      yy += 16;
+      if(yy > y+h-12) break;
+    }
+
+    // 右端に小さな88鍵風スケール。鳴っている音だけ点灯。
+    const stripX = x + w - 22;
+    const stripTop = y + 42;
+    const stripH = h - 56;
+    ctx.fillStyle='rgba(255,255,255,.08)';
+    ctx.fillRect(stripX, stripTop, 7, stripH);
+    for(const n of activeNotes){
+      const py = stripTop + stripH - ((n.note - minNote) / (maxNote - minNote || 1)) * stripH;
+      ctx.fillStyle='rgba(255,204,110,.95)';
+      ctx.fillRect(stripX-2, py-1, 11, 2);
+    }
+    ctx.restore();
+  }
+  function draw(){requestAnimationFrame(draw); const t=currentTime(); syncSeekUI(t); if(playing){songTime=t;if(songTime>duration+.5)stop(); schedule();}
+    ctx.fillStyle='#030811'; ctx.fillRect(0,0,W,H);
+    const scopeH = Math.min(H, W/2.39);
+    const barH = Math.max(0, (H - scopeH) / 2);
+    const grd=ctx.createLinearGradient(0,barH,W,H-barH);
+    grd.addColorStop(0,'#07121f');
+    grd.addColorStop(.48,'#10263a');
+    grd.addColorStop(1,'#050d18');
+    ctx.fillStyle=grd; ctx.fillRect(0,barH,W,scopeH);
+    // ノートONの出現ライン。
+    // 右上UIパネルの裏に隠れると「左まで流れてから急に出る」ように見えるため、
+    // 実際のUI左端を読んで、その少し左にラインを置く。
+    const uiRect = document.querySelector('.ui')?.getBoundingClientRect();
+    const uiSafeLeft = uiRect ? uiRect.left - 64 : W * .82;
+    const baseCx = Math.max(W * .58, Math.min(W * .82, uiSafeLeft));
+    const cx = Math.max(40, Math.min(W - 40, baseCx + visualOffset));
+    const pixelsPerSec=185 * visualSpeed;
+    const visualLeadSec = 0.00; // 0なら発音タイミングで出現。表示位置だけ右寄りに調整
+
+    drawStarfield(barH,scopeH,t);
+
+    // antique paper-like scanlines and grid
+    ctx.save(); ctx.beginPath(); ctx.rect(0,barH,W,scopeH); ctx.clip();
+    ctx.globalAlpha=.22;
+    for(let yy=barH; yy<barH+scopeH; yy+=4){ctx.fillStyle='rgba(255,204,110,.042)'; ctx.fillRect(0,yy,W,1);}
+    ctx.globalAlpha=.16;
+    for(let x=0; x<W; x+=64){ctx.strokeStyle='rgba(255,204,110,.18)';ctx.beginPath();ctx.moveTo(x,barH);ctx.lineTo(x,barH+scopeH);ctx.stroke();}
+    ctx.globalAlpha=.08;
+    for(let i=0;i<420;i++){const px=(Math.sin(i*91.7)*43758.5453%1+1)%1*W;const py=barH+((Math.sin(i*37.3)*24634.6345%1+1)%1)*scopeH;ctx.fillStyle='rgba(255,226,162,.55)';ctx.fillRect(px,py,1,1);}
+    ctx.restore();
+
+    ctx.strokeStyle='rgba(255,204,110,.16)'; ctx.lineWidth=1; for(let n=minNote;n<=maxNote;n++){if(n%12===0){const yy=y(n);ctx.beginPath();ctx.moveTo(0,yy);ctx.lineTo(W,yy);ctx.stroke();}}
+    ctx.strokeStyle='rgba(255,204,110,.72)'; ctx.shadowColor='rgba(255,204,110,.42)'; ctx.shadowBlur=18; ctx.beginPath(); ctx.moveTo(cx,barH); ctx.lineTo(cx,H-barH); ctx.stroke(); ctx.shadowBlur=0;
+    ctx.fillStyle='rgba(255,204,110,.74)'; ctx.font='12px ui-monospace, SFMono-Regular, Menlo, monospace'; ctx.fillText('✦ NOTE ON / APPEARANCE GATE', Math.min(W-255, cx+10), barH+24);
+
+    // ノートONの瞬間にノート長ぶんを一括表示。
+    // 発音後は音が終わっても消さず、左端へ流れ切るまで保持する。
+    ctx.save(); ctx.globalCompositeOperation='source-over';
+    let visibleCount=0;
+    const pendingLabels=[]; // ノートを全部描いたあと、最後に文字だけ前面へ描く
+    for(const n of notes){
+      const vt = t + visualLeadSec;
+      if(n.start>vt) continue;
+      const dur=Math.max(.04,n.end-n.start);
+      const w=Math.max(9,dur*pixelsPerSec);
+      const x1=cx-(vt-n.start)*pixelsPerSec;
+      const right=x1+w;
+      if(right<-120) continue;
+      visibleCount++;
+      ctx.globalCompositeOperation='source-over';
+      const yy=y(n.note);
+      const h=Math.max(2,(H-160)/(maxNote-minNote+1)*noteThickness); // 細長いノート
+      const age=vt-n.start;
+
+      // 左端に近づいたときだけフェード。途中では基本的に消えない。
+      const leftFade=Math.min(1, Math.max(0, (right+120)/260));
+      const bornFade=Math.min(1, age/.06);
+      const alpha=.92 * leftFade * bornFade;
+
+      ctx.shadowColor='rgba(255,204,110,.32)'; ctx.shadowBlur=7*leftFade;
+      ctx.fillStyle=colorFor(n.note,n.vel,alpha);
+      ctx.fillRect(x1,yy-h/2,w,h);
+      ctx.shadowBlur=0;
+      ctx.fillStyle=`rgba(255,239,198,${.16*leftFade})`;
+      ctx.fillRect(x1,yy-h/2,Math.max(1,w),Math.max(1,h*.18));
+
+      // ラベル情報はここでは描かず、後段でまとめて描く。
+      // こうすると、後から描かれたノートに文字が隠れず、常に前面表示になる。
+      if(w>26 && right>20 && x1<W-20){
+        const labelCutX = W * labelCutRatio; // 文字消失位置
+        const glitchBand = 118;          // 消え際のフェード/ちらつき幅
+        const appearDelay = labelDelay;      // ノート出現後、文字が出始めるまでの遅延 秒
+        const stableNoise = Math.abs(Math.sin(n.start*1237.91 + n.note*47.13 + n.vel*3.17 + n.ch*91.7));
+        // 出現ノイズの持続時間を短めに分布させる。
+        // 60%: 即表示、25%: 40-80ms、10%: 80-120ms、5%: 120-160ms。
+        let appearDuration = .035;
+        let appearGlitchStrength = 0;
+        if(stableNoise < .60){
+          appearDuration = .035;
+          appearGlitchStrength = 0;
+        } else if(stableNoise < .85){
+          appearDuration = .04 + ((stableNoise - .60) / .25) * .04;
+          appearGlitchStrength = .35;
+        } else if(stableNoise < .95){
+          appearDuration = .08 + ((stableNoise - .85) / .10) * .04;
+          appearGlitchStrength = .62;
+        } else {
+          appearDuration = .12 + ((stableNoise - .95) / .05) * .04;
+          appearGlitchStrength = .90;
+        }
+        const disappearLife = Math.min(1, Math.max(0, (x1 - (labelCutX - glitchBand)) / glitchBand));
+        const appearLife = Math.min(1, Math.max(0, (age - appearDelay) / appearDuration));
+        const labelLife = disappearLife * appearLife;
+        if(labelLife > 0){
+          pendingLabels.push({
+            label:`${noteName(n.note)}  LEN:${durText(dur)}  V:${n.vel}  CH:${n.ch+1}`,
+            lx: Math.min(W-220, Math.max(8,x1+6)),
+            ly: yy-h*.85-4,
+            x1,
+            age,
+            labelCutX,
+            appearDuration,
+            labelLife,
+            leftFade,
+            start:n.start,
+            note:n.note,
+            // ノートごとに出現時ノイズ量を固定してばらつかせる。
+            // 低い値のラベルはほぼチカチカせず、そのまま点灯する。
+            appearGlitch: appearGlitchStrength
+          });
+        }
+      }
+    }
+
+    // 文字列を最後に描くことで、ノートの前面に表示する。
+    ctx.globalCompositeOperation='source-over';
+    ctx.font='9px ui-monospace, SFMono-Regular, Menlo, monospace';
+    for(const lab of pendingLabels){
+      const disappearing = lab.x1 < lab.labelCutX;
+      const appearingRaw = lab.age < lab.appearDuration;
+      const jitterSeed = Math.sin((lab.start*997+lab.note*31+t*53))*10000;
+      const rand = jitterSeed - Math.floor(jitterSeed);
+      const rand2 = (Math.sin((lab.start*431+lab.note*73+t*91))*10000)%1;
+
+      // 出現時のチカチカは全ノート一律にしない。
+      // 多くは即表示、少数だけ短くデジタルノイズをまとって出る。
+      const appearNoise = lab.appearGlitch;
+      const appearing = appearingRaw && appearNoise > .03;
+      const inGlitch = disappearing || appearing;
+      const blinkThreshold = appearing ? (.22 + appearNoise * .28) : .32;
+      const blinkDim = appearing ? (.62 - appearNoise * .34) : .08;
+      const blink = inGlitch ? (rand > blinkThreshold ? 1 : blinkDim) : 1;
+      const baseAlpha = .96 * lab.leftFade * lab.labelLife * blink;
+
+      // 文字の背面に薄い影を置いて、白ノートの上でも読めるようにする。
+      ctx.save();
+      ctx.shadowColor='rgba(0,0,0,.65)';
+      ctx.shadowBlur=4;
+      ctx.fillStyle=`rgba(5,13,24,${.50*baseAlpha})`;
+      ctx.fillText(lab.label, lab.lx+1, lab.ly+1);
+      ctx.shadowBlur=0;
+      ctx.fillStyle=`rgba(255,204,110,${baseAlpha})`;
+      ctx.fillText(lab.label, lab.lx, lab.ly);
+
+      // 出現時と消え際だけ、水平ズレを薄く重ねる。
+      // 出現時はノートごとの appearNoise で控えめ〜なしにばらつく。
+      const glitchChance = appearing ? (.84 - appearNoise * .28) : .52;
+      if(inGlitch && rand > glitchChance){
+        const glitchAlpha = (appearing ? (.12 + appearNoise * .24) : .58) * lab.labelLife * lab.leftFade;
+        ctx.globalAlpha = glitchAlpha;
+        const dir = appearing ? 1 : -1;
+        const shift = appearing ? (1 + rand*3.5*appearNoise) : (4 + rand*11);
+        ctx.fillStyle='rgba(255,239,198,.86)';
+        ctx.fillText(lab.label, lab.lx + dir*shift, lab.ly + (rand>.82 ? -1 : 1));
+        ctx.fillStyle='rgba(255,160,92,.62)';
+        ctx.fillText(lab.label.slice(0, Math.max(4, Math.floor(lab.label.length*(.28+Math.abs(rand2)*.55)))), lab.lx - dir*(1.5 + rand*5), lab.ly);
+      }
+      ctx.restore();
+    }
+    ctx.restore();
+
+    // 情報量を増やすための装飾HUD
+    const upcoming=notes.find(n=>n.start>=t);
+    const recent=notes.filter(n=>n.start<=t && n.start>t-1.2).slice(-4).map(n=>`${noteName(n.note)}  v${n.vel}  ${durText(n.end-n.start)}`);
+    drawPanel(18,H-170,250,108,'LIVE NOTE TELEMETRY', recent.length?recent:['waiting for note-on…'], .50);
+    if(upcoming) drawPanel(W-285,70,255,90,'NEXT SIGNAL', [`${noteName(upcoming.note)} / ch ${upcoming.ch+1}`, `in ${Math.max(0,upcoming.start-t).toFixed(2)}s`, `length ${durText(upcoming.end-upcoming.start)}`], .38);
+    drawActiveNotesPanel(W-292,H-155,265,118,t);
+    ctx.fillStyle='rgba(244,213,138,.82)'; ctx.font='12px ui-monospace, SFMono-Regular, Menlo, monospace'; ctx.fillText(`${fmt(t)} / ${fmt(duration)}  ${notes.length} notes  / visible ${visibleCount}`, 18, H-22);
+  }
+  function roundRect(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath();}
+  function fmt(s){s=Math.max(0,s||0);return `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`}
+  function syncSeekUI(time=currentTime()){
+    const len=Math.max(0,duration||0);
+    const t=Math.max(0,Math.min(len,time||0));
+    seekBar.max=String(len || 0);
+    if(!seeking) seekBar.value=String(t);
+    seekTime.textContent = `${fmt(t)} / ${fmt(len)}`;
   }
 
-  const data = snap.data().items || [];
-  data.forEach(d => addMarker(d));
-
-  if (data.length) {
-    console.log(`🐾 ${data.length} 件の猫をFirestoreから復元しました`);
+  function syncSettingsUI(){
+    visualOffsetText.textContent = `${visualOffset}px`;
+    visualSpeedText.textContent = visualSpeed.toFixed(2)+'x';
+    visualSpeedMenuText.textContent = visualSpeed.toFixed(2)+'x';
+    noteThicknessText.textContent = noteThickness.toFixed(2);
+    labelDelayText.textContent = labelDelay.toFixed(2)+'s';
+    labelCutText.textContent = Math.round(labelCutRatio*100)+'%';
   }
-}
+  menuBtn.onclick=()=>{settingsOverlay.style.display='block';};
+  settingsClose.onclick=()=>{settingsOverlay.style.display='none';};
+  settingsOverlay.addEventListener('click',e=>{if(e.target===settingsOverlay) settingsOverlay.style.display='none';});
+  visualOffsetInput.oninput=()=>{visualOffset=parseInt(visualOffsetInput.value,10)||0; syncSettingsUI();};
+  visualSpeedMenuInput.oninput=()=>{visualSpeed=parseFloat(visualSpeedMenuInput.value); visualSpeedInput.value=visualSpeedMenuInput.value; syncSettingsUI();};
+  noteThicknessInput.oninput=()=>{noteThickness=parseFloat(noteThicknessInput.value); syncSettingsUI();};
+  labelDelayInput.oninput=()=>{labelDelay=parseFloat(labelDelayInput.value); syncSettingsUI();};
+  labelCutInput.oninput=()=>{labelCutRatio=parseFloat(labelCutInput.value); syncSettingsUI();};
+  syncSettingsUI();
 
-
-
+  fileInput.onchange=async()=>{const f=fileInput.files[0]; if(!f)return; try{stop(); const parsed=parseMidi(await f.arrayBuffer()); notes=parsed.notes; noteEvents=parsed.events; duration=parsed.duration; title=parsed.title||f.name; if(notes.length){minNote=Math.max(0,Math.min(...notes.map(n=>n.note))-3);maxNote=Math.min(127,Math.max(...notes.map(n=>n.note))+3);} seekTo(0); syncSeekUI(0); nameEl.textContent=f.name; const warn=parsed.warnings.length?` / 注意: ${parsed.warnings.slice(0,3).join('、')}${parsed.warnings.length>3?'…':''}`:''; statusEl.textContent=`読込完了: ${notes.length} notes / ${fmt(duration)} / format ${parsed.format} / ${parsed.tracksRead}/${parsed.ntrks} tracks / ${parsed.locNote}${title?' / '+title:''}${warn}`;}catch(e){console.error(e);statusEl.textContent='読み込み失敗: '+e.message+'。可能ならDAWやMuseScoreで「標準MIDI形式」で書き出し直すと読める場合があります。';}};
+  playBtn.onclick=play; pauseBtn.onclick=pause; stopBtn.onclick=stop; muteBtn.onclick=()=>{muted=!muted;muteBtn.textContent=muted?'Sound OFF':'Sound ON'}; recStartBtn.onclick=startVideoRecording; recStopBtn.onclick=stopVideoRecording; seekBackBtn.onclick=()=>skipBy(-5); seekForwardBtn.onclick=()=>skipBy(5); seekBar.oninput=()=>{seeking=true; songTime=parseFloat(seekBar.value)||0; stopActiveNotes(); resetScheduleFrom(songTime); if(playing){startSong=songTime; startWall=performance.now();} syncSeekUI(songTime);}; seekBar.onchange=()=>{seeking=false; seekTo(parseFloat(seekBar.value)||0);}; speedInput.oninput=()=>{const old=currentTime(); speed=parseFloat(speedInput.value); speedText.textContent=speed.toFixed(2)+'x'; if(playing){startSong=old; startWall=performance.now(); resetScheduleFrom(old);}};
+  visualSpeedInput.oninput=()=>{visualSpeed=parseFloat(visualSpeedInput.value); visualSpeedMenuInput.value=visualSpeedInput.value; syncSettingsUI();};
+  document.addEventListener('keydown', e=>{
+    const tag = document.activeElement?.tagName;
+    if(tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    if(e.code === 'Space'){
+      e.preventDefault();
+      playing ? pause() : play();
+    } else if(e.key === 'ArrowLeft'){
+      e.preventDefault();
+      skipBy(-5);
+    } else if(e.key === 'ArrowRight'){
+      e.preventDefault();
+      skipBy(5);
+    }
+  });
+  draw();
+})();
 </script>
-
-<script async
-  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB5kbAl74HZzz9TbQSNakdeG9XMc-8EVeI&callback=initMap">
-</script>
-
-
-
-
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
-import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
-
-const firebaseConfig = {
-  apiKey: "AIzaSyC_HyYwQMwfODX15o5HXjw7aYSPnuaFTOg",
-  authDomain: "nekocatsmap.firebaseapp.com",
-  projectId: "nekocatsmap",
-  storageBucket: "nekocatsmap.firebasestorage.app",
-  messagingSenderId: "247582443573",
-  appId: "1:247582443573:web:078b7acb7e0bd7ca81897c"
-};
-
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-
-window.firebaseDB = db;
-window.firebaseDoc = doc;
-window.firebaseSetDoc = setDoc;
-window.firebaseGetDoc = getDoc;
-
-console.log("🔥 Firebase接続成功");
-</script>
-
-
 </body>
 </html>
