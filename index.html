@@ -64,6 +64,138 @@
     #map-shell {
       z-index: 0;
       touch-action: none;
+      transition: opacity 520ms ease;
+    }
+
+    #street-view-shell {
+      position: absolute;
+      z-index: 6;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #05080b;
+      opacity: 0;
+      transform: scale(1.018);
+      transition: opacity 520ms ease, transform 900ms cubic-bezier(0.2, 0.7, 0.2, 1);
+      pointer-events: none;
+    }
+
+    #street-view-shell.is-active {
+      opacity: 1;
+      transform: scale(1);
+      pointer-events: auto;
+    }
+
+    #street-view {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    .street-view-toolbar {
+      position: absolute;
+      z-index: 20;
+      top: max(12px, env(safe-area-inset-top));
+      left: max(12px, env(safe-area-inset-left));
+      right: max(12px, env(safe-area-inset-right));
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      opacity: 0;
+      transform: translateY(-8px);
+      transition: opacity 180ms ease, transform 180ms ease;
+      pointer-events: none;
+    }
+
+    body.spot-mode .street-view-toolbar {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+
+    .street-view-back,
+    .street-view-caption {
+      border: 1px solid var(--line);
+      background: var(--glass-strong);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(16px) saturate(125%);
+      -webkit-backdrop-filter: blur(16px) saturate(125%);
+    }
+
+    .street-view-back {
+      min-width: 98px;
+      height: 44px;
+      padding: 0 13px;
+      border-radius: 15px;
+      cursor: pointer;
+    }
+
+    .street-view-caption {
+      min-width: 0;
+      max-width: min(70vw, 540px);
+      min-height: 44px;
+      display: grid;
+      align-content: center;
+      gap: 2px;
+      padding: 6px 13px;
+      border-radius: 15px;
+    }
+
+    .street-view-caption strong,
+    .street-view-caption span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .street-view-caption strong {
+      font-size: 12px;
+      letter-spacing: 0.04em;
+    }
+
+    .street-view-caption span {
+      color: var(--muted);
+      font-size: 10px;
+    }
+
+    .street-view-loading {
+      position: absolute;
+      z-index: 8;
+      top: calc(max(12px, env(safe-area-inset-top)) + 58px);
+      left: 50%;
+      max-width: min(86vw, 420px);
+      padding: 8px 13px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--glass-strong);
+      box-shadow: var(--shadow);
+      color: var(--muted);
+      font-size: 11px;
+      text-align: center;
+      opacity: 0;
+      transform: translate(-50%, 8px);
+      transition: opacity 180ms ease, transform 180ms ease;
+      pointer-events: none;
+    }
+
+    body.spot-mode:not(.street-view-ready) .street-view-loading {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+
+    body.spot-mode .topbar,
+    body.spot-mode .sensor-pill,
+    body.spot-mode .reticle,
+    body.spot-mode .hint,
+    body.spot-mode .dock {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    body.street-view-settled #map-shell {
+      visibility: hidden;
     }
 
     .topbar {
@@ -422,7 +554,8 @@
     body.clean-mode .topbar,
     body.clean-mode .sensor-pill,
     body.clean-mode .hint,
-    body.clean-mode .dock {
+    body.clean-mode .dock,
+    body.clean-mode .street-view-toolbar {
       opacity: 0;
       transform: translateY(8px);
       pointer-events: none;
@@ -533,6 +666,22 @@
       .hint {
         bottom: calc(max(8px, env(safe-area-inset-bottom)) + 70px);
       }
+
+      .street-view-toolbar {
+        gap: 6px;
+      }
+
+      .street-view-back {
+        min-width: 88px;
+        height: 42px;
+        padding-inline: 10px;
+        font-size: 12px;
+      }
+
+      .street-view-caption {
+        min-height: 42px;
+        padding-inline: 10px;
+      }
     }
 
     @media (max-height: 520px) and (orientation: landscape) {
@@ -580,6 +729,18 @@
 <body>
   <main id="app">
     <div id="map-shell" aria-label="Google 3D map"></div>
+    <div id="street-view-shell" aria-hidden="true">
+      <div id="street-view" aria-label="ストリートビュー"></div>
+    </div>
+
+    <div id="street-view-toolbar" class="street-view-toolbar">
+      <button id="street-view-back" class="street-view-back" type="button">← 地図へ戻る</button>
+      <div class="street-view-caption" role="status" aria-live="polite">
+        <strong id="street-view-title">スポット</strong>
+        <span id="street-view-status">ストリートビューを準備しています…</span>
+      </div>
+    </div>
+    <div class="street-view-loading">3D地図からストリートビューへ移動しています…</div>
 
     <div class="topbar">
       <div class="brand" aria-hidden="true">
@@ -645,6 +806,14 @@
   <script>
     const API_KEY = "AIzaSyB5kbAl74HZzz9TbQSNakdeG9XMc-8EVeI";
     const STORAGE_KEY = "earth_spot_camera_v1";
+    const FIREBASE_CONFIG = {
+      apiKey: "AIzaSyC_HyYwQMwfODX15o5HXjw7aYSPnuaFTOg",
+      authDomain: "nekocatsmap.firebaseapp.com",
+      projectId: "nekocatsmap",
+      storageBucket: "nekocatsmap.firebasestorage.app",
+      messagingSenderId: "247582443573",
+      appId: "1:247582443573:web:078b7acb7e0bd7ca81897c"
+    };
     const DEFAULT_CAMERA = {
       center: { lat: 35.65858, lng: 139.74543, altitude: 40 },
       range: 1250,
@@ -655,6 +824,12 @@
 
     const elements = {
       mapShell: document.getElementById("map-shell"),
+      streetViewShell: document.getElementById("street-view-shell"),
+      streetView: document.getElementById("street-view"),
+      streetViewToolbar: document.getElementById("street-view-toolbar"),
+      streetViewBack: document.getElementById("street-view-back"),
+      streetViewTitle: document.getElementById("street-view-title"),
+      streetViewStatus: document.getElementById("street-view-status"),
       searchForm: document.getElementById("search-form"),
       searchInput: document.getElementById("search-input"),
       headingValue: document.getElementById("heading-value"),
@@ -676,9 +851,23 @@
 
     let map;
     let geocoder;
+    let panorama;
+    let streetViewService;
+    let Marker3DInteractiveElementClass;
+    let mapMarkers = [];
     let toastTimer;
     let orbiting = false;
     let saveTimer;
+
+    const viewState = {
+      mode: "map",
+      token: 0,
+      returnCamera: null,
+      resumeMapGyro: false,
+      selectedSpot: null
+    };
+
+    const resolvedPanoCache = new Map();
 
     const gyro = {
       active: false,
@@ -778,6 +967,7 @@
     }
 
     function scheduleSaveCamera() {
+      if (viewState.mode !== "map") return;
       clearTimeout(saveTimer);
       saveTimer = setTimeout(() => {
         try {
@@ -870,6 +1060,380 @@
         showToast("場所が見つかりませんでした");
         setSensorStatus("場所名・住所または緯度,経度を入力してください", "warn");
       }
+    }
+
+    function normalizeSpot(raw, index) {
+      if (!raw || typeof raw !== "object") return null;
+      const lat = finiteNumber(raw.lat, NaN);
+      const lng = finiteNumber(raw.lng, NaN);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+        return null;
+      }
+
+      const pano = typeof raw.pano === "string" ? raw.pano.trim() : "";
+      const titleSource = raw.title || raw.name || raw.label;
+      return {
+        id: String(raw.id || `spot-${index + 1}`),
+        title: typeof titleSource === "string" && titleSource.trim() ? titleSource.trim() : `スポット ${index + 1}`,
+        lat,
+        lng,
+        pano,
+        heading: normalize360(finiteNumber(raw.heading, 0)),
+        pitch: clamp(finiteNumber(raw.pitch, 0), -90, 90),
+        zoom: clamp(finiteNumber(raw.zoom, 1), 0, 5)
+      };
+    }
+
+    function renderSpotMarkers(spots) {
+      mapMarkers.forEach(marker => marker.remove());
+      mapMarkers = [];
+
+      spots.forEach((spot, index) => {
+        const marker = new Marker3DInteractiveElementClass({
+          position: { lat: spot.lat, lng: spot.lng },
+          altitudeMode: "CLAMP_TO_GROUND",
+          label: "🐈",
+          title: `${spot.title}のストリートビューを開く`,
+          sizePreserved: true,
+          drawsWhenOccluded: true,
+          zIndex: index + 1
+        });
+        marker.addEventListener("gmp-click", event => {
+          event.stopPropagation();
+          openStreetViewSpot(spot);
+        });
+        map.append(marker);
+        mapMarkers.push(marker);
+      });
+    }
+
+    function shouldAutoFrameSpots() {
+      const params = new URLSearchParams(location.search);
+      if (params.has("lat") && params.has("lng")) return false;
+      try {
+        return !localStorage.getItem(STORAGE_KEY);
+      } catch {
+        return true;
+      }
+    }
+
+    function distanceMeters(a, b) {
+      const radius = 6371000;
+      const toRadians = value => value * Math.PI / 180;
+      const dLat = toRadians(b.lat - a.lat);
+      const dLng = toRadians(b.lng - a.lng);
+      const latA = toRadians(a.lat);
+      const latB = toRadians(b.lat);
+      const value = Math.sin(dLat / 2) ** 2
+        + Math.cos(latA) * Math.cos(latB) * Math.sin(dLng / 2) ** 2;
+      return 2 * radius * Math.asin(Math.sqrt(value));
+    }
+
+    function frameSpotMarkers(spots) {
+      if (!spots.length || !map) return;
+      if (!shouldAutoFrameSpots()) {
+        const camera = currentCamera();
+        const nearest = spots.reduce(
+          (minimum, spot) => Math.min(minimum, distanceMeters(camera.center, spot)),
+          Number.POSITIVE_INFINITY
+        );
+        if (nearest <= Math.max(camera.range * 1.4, 3000)) return;
+      }
+      const center = spots.reduce((sum, spot) => ({
+        lat: sum.lat + spot.lat / spots.length,
+        lng: sum.lng + spot.lng / spots.length
+      }), { lat: 0, lng: 0 });
+      const farthest = spots.reduce((max, spot) => Math.max(max, distanceMeters(center, spot)), 0);
+      const range = spots.length === 1
+        ? 2200
+        : clamp(farthest * 2.2, 5000, 3200000);
+      map.flyCameraTo({
+        endCamera: {
+          center: { ...center, altitude: 0 },
+          range,
+          heading: 0,
+          tilt: spots.length === 1 ? 58 : 28,
+          roll: 0
+        },
+        durationMillis: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 1600
+      });
+    }
+
+    async function loadFirebaseSpots() {
+      setSensorStatus("Firebaseからスポットを読み込んでいます…", "idle");
+      try {
+        const [firebaseAppModule, firestoreModule] = await Promise.all([
+          import("https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js"),
+          import("https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js")
+        ]);
+        const firebaseApp = firebaseAppModule.getApps().length
+          ? firebaseAppModule.getApp()
+          : firebaseAppModule.initializeApp(FIREBASE_CONFIG);
+        const db = firestoreModule.getFirestore(firebaseApp);
+        const markerSnapshot = await firestoreModule.getDoc(
+          firestoreModule.doc(db, "catsmap", "markers")
+        );
+
+        const records = markerSnapshot.exists() && Array.isArray(markerSnapshot.data().items)
+          ? markerSnapshot.data().items
+          : [];
+
+        const spots = records.map(normalizeSpot).filter(Boolean);
+        renderSpotMarkers(spots);
+        frameSpotMarkers(spots);
+        if (spots.length) {
+          setSensorStatus(`${spots.length}件のスポットを表示中・猫ピンをタップしてください`, "active");
+        } else {
+          setSensorStatus("Firebaseに表示できるスポットがありません", "warn");
+        }
+      } catch (error) {
+        console.warn("Firebaseのスポットを読み込めませんでした", error);
+        setSensorStatus("スポットを読み込めませんでした。3D地図はそのまま操作できます", "warn");
+        showToast("Firebaseの読み取り権限または通信状態を確認してください", 3400);
+      }
+    }
+
+    function delay(milliseconds) {
+      return new Promise(resolve => setTimeout(resolve, milliseconds));
+    }
+
+    function cancelledTransitionError() {
+      const error = new Error("transition-cancelled");
+      error.cancelled = true;
+      return error;
+    }
+
+    async function resolveSpotPanorama(spot) {
+      const cacheKey = `${spot.pano}|${spot.lat.toFixed(6)}|${spot.lng.toFixed(6)}`;
+      const cached = resolvedPanoCache.get(cacheKey);
+      if (cached) return cached;
+
+      if (spot.pano) {
+        try {
+          const response = await streetViewService.getPanorama({ pano: spot.pano });
+          const location = response.data?.location;
+          if (location?.pano) {
+            const result = { pano: location.pano, fallbackUsed: false };
+            resolvedPanoCache.set(cacheKey, result);
+            return result;
+          }
+        } catch (error) {
+          console.info("保存済みPano IDが無効なため位置から再検索します", error);
+        }
+      }
+
+      for (const radius of [120, 500]) {
+        try {
+          const response = await streetViewService.getPanorama({
+            location: { lat: spot.lat, lng: spot.lng },
+            radius,
+            preference: "nearest"
+          });
+          const location = response.data?.location;
+          if (location?.pano) {
+            const result = { pano: location.pano, fallbackUsed: true };
+            resolvedPanoCache.set(cacheKey, result);
+            return result;
+          }
+        } catch (error) {
+          console.info(`${radius}m以内にストリートビューが見つかりません`, error);
+        }
+      }
+      throw new Error("STREET_VIEW_NOT_FOUND");
+    }
+
+    function waitForPanorama(spot, resolved, token) {
+      return new Promise((resolve, reject) => {
+        if (token !== viewState.token || viewState.mode !== "entering") {
+          reject(cancelledTransitionError());
+          return;
+        }
+        let finished = false;
+        let targetStatusReceived = panorama.getPano() === resolved.pano && panorama.getStatus() === "OK";
+        const listeners = [];
+        let timeoutId;
+        let graceTimer;
+
+        const cleanup = () => {
+          listeners.forEach(listener => listener.remove());
+          clearTimeout(timeoutId);
+          clearTimeout(graceTimer);
+        };
+        const fail = error => {
+          if (finished) return;
+          finished = true;
+          cleanup();
+          reject(error);
+        };
+        const succeed = () => {
+          if (finished) return;
+          if (token !== viewState.token) return fail(cancelledTransitionError());
+          finished = true;
+          cleanup();
+          panorama.setPov({ heading: spot.heading, pitch: spot.pitch });
+          panorama.setZoom(spot.zoom);
+          graceTimer = setTimeout(() => resolve(resolved), 260);
+        };
+        const checkStatus = fromStatusEvent => {
+          if (token !== viewState.token) return fail(cancelledTransitionError());
+          if (fromStatusEvent) targetStatusReceived = true;
+          const status = panorama.getStatus();
+          if (targetStatusReceived && status === "OK" && panorama.getPano() === resolved.pano) succeed();
+          if (status === "ZERO_RESULTS") fail(new Error("STREET_VIEW_NOT_FOUND"));
+        };
+
+        listeners.push(panorama.addListener("status_changed", () => checkStatus(true)));
+        timeoutId = setTimeout(() => fail(new Error("STREET_VIEW_TIMEOUT")), 8500);
+
+        panorama.setMotionTracking(false);
+        panorama.setVisible(true);
+        google.maps.event.trigger(panorama, "resize");
+        panorama.setPano(resolved.pano);
+        panorama.setPov({ heading: spot.heading, pitch: spot.pitch });
+        panorama.setZoom(spot.zoom);
+        setTimeout(() => checkStatus(false), 120);
+      });
+    }
+
+    function animateMapCamera(endCamera, durationMillis) {
+      return new Promise(resolve => {
+        if (!map) return resolve();
+        let finished = false;
+        let timeoutId;
+        const finish = () => {
+          if (finished) return;
+          finished = true;
+          clearTimeout(timeoutId);
+          map.removeEventListener("gmp-animationend", onAnimationEnd);
+          resolve();
+        };
+        const onAnimationEnd = () => finish();
+        map.addEventListener("gmp-animationend", onAnimationEnd);
+        map.flyCameraTo({ endCamera, durationMillis });
+        timeoutId = setTimeout(finish, Math.max(300, durationMillis + 1200));
+        if (durationMillis === 0) setTimeout(finish, 80);
+      });
+    }
+
+    async function openStreetViewSpot(spot) {
+      if (!map || !panorama || viewState.mode !== "map") return;
+      const token = ++viewState.token;
+      viewState.mode = "entering";
+      viewState.returnCamera = currentCamera();
+      viewState.resumeMapGyro = gyro.active;
+      viewState.selectedSpot = spot;
+
+      if (gyro.active) stopGyro(false);
+      if (orbiting) {
+        orbiting = false;
+        elements.orbitButton.setAttribute("aria-pressed", "false");
+      }
+      map.stopCameraAnimation();
+      document.body.classList.add("spot-mode");
+      document.body.classList.remove("street-view-ready", "street-view-settled");
+      elements.streetViewTitle.textContent = spot.title;
+      elements.streetViewStatus.textContent = "Pano IDを確認しながら地上へ移動しています…";
+      elements.streetViewShell.classList.remove("is-active");
+      elements.streetViewShell.setAttribute("aria-hidden", "true");
+      await delay(70);
+      if (token !== viewState.token) return;
+
+      const duration = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 2400;
+      const flight = animateMapCamera({
+        center: { lat: spot.lat, lng: spot.lng, altitude: 0 },
+        range: 85,
+        heading: spot.heading,
+        tilt: 78,
+        roll: 0
+      }, duration);
+      const panoramaReady = resolveSpotPanorama(spot)
+        .then(resolved => {
+          if (token !== viewState.token || viewState.mode !== "entering") {
+            throw cancelledTransitionError();
+          }
+          return waitForPanorama(spot, resolved, token);
+        });
+
+      try {
+        const [, resolved] = await Promise.all([flight, panoramaReady]);
+        if (token !== viewState.token) return;
+        viewState.mode = "streetview";
+        elements.streetViewStatus.textContent = resolved.fallbackUsed
+          ? "Pano IDが変わったため、近くの最新画像を表示しています"
+          : "端末を動かして周囲を見渡せます";
+        elements.streetViewShell.setAttribute("aria-hidden", "false");
+        elements.streetViewShell.classList.add("is-active");
+        document.body.classList.add("street-view-ready");
+        google.maps.event.trigger(panorama, "resize");
+        panorama.setPov({ heading: spot.heading, pitch: spot.pitch });
+        panorama.setZoom(spot.zoom);
+        panorama.setMotionTracking(true);
+        panorama.focus();
+        if (resolved.fallbackUsed) showToast("保存されたPano IDが変わったため、緯度経度から再検索しました", 3500);
+        setTimeout(() => {
+          if (token === viewState.token && viewState.mode === "streetview") {
+            document.body.classList.add("street-view-settled");
+          }
+        }, 560);
+      } catch (error) {
+        if (token !== viewState.token || error.cancelled) return;
+        console.warn("ストリートビューへ移動できませんでした", error);
+        viewState.mode = "recovering";
+        panorama.setVisible(false);
+        elements.streetViewShell.classList.remove("is-active");
+        document.body.classList.remove("street-view-ready", "street-view-settled");
+        elements.streetViewStatus.textContent = "表示できないため見下ろし地図へ戻っています…";
+        showToast("このスポットのストリートビューを表示できませんでした", 3400);
+        setSensorStatus("ストリートビューが見つかりません。別のピンを試してください", "warn");
+        map.stopCameraAnimation();
+        await delay(70);
+        if (token !== viewState.token) return;
+        if (viewState.returnCamera) {
+          await animateMapCamera(viewState.returnCamera, duration ? 1300 : 0);
+        }
+        if (token !== viewState.token) return;
+        document.body.classList.remove("spot-mode");
+        viewState.mode = "map";
+        viewState.returnCamera = null;
+        viewState.selectedSpot = null;
+        updateReadout();
+        scheduleSaveCamera();
+        if (viewState.resumeMapGyro) void startGyro();
+      }
+    }
+
+    async function closeStreetView() {
+      if (viewState.mode === "map" || viewState.mode === "leaving") return;
+      const wasVisible = viewState.mode === "streetview";
+      const returnCamera = viewState.returnCamera;
+      const resumeMapGyro = viewState.resumeMapGyro;
+      const token = ++viewState.token;
+      viewState.mode = "leaving";
+
+      document.body.classList.remove("street-view-settled", "street-view-ready");
+      elements.streetViewStatus.textContent = "見下ろし地図へ戻っています…";
+      elements.streetViewShell.classList.remove("is-active");
+      elements.streetViewShell.setAttribute("aria-hidden", "true");
+      panorama.setMotionTracking(false);
+      await delay(wasVisible ? 540 : 80);
+      if (token !== viewState.token) return;
+      panorama.setVisible(false);
+      document.body.classList.remove("spot-mode");
+
+      if (returnCamera) {
+        map.stopCameraAnimation();
+        await delay(70);
+        const duration = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 1500;
+        await animateMapCamera(returnCamera, duration);
+      }
+      if (token !== viewState.token) return;
+      viewState.mode = "map";
+      viewState.returnCamera = null;
+      viewState.selectedSpot = null;
+      updateReadout();
+      scheduleSaveCamera();
+      setSensorStatus("猫ピンをタップするとストリートビューへ移動します", "active");
+      if (resumeMapGyro) void startGyro();
     }
 
     function readOrientation(event) {
@@ -1168,6 +1732,7 @@
 
     function bindUi() {
       elements.searchForm.addEventListener("submit", searchLocation);
+      elements.streetViewBack.addEventListener("click", closeStreetView);
       elements.gyroButton.addEventListener("click", toggleGyro);
       elements.calibrateButton.addEventListener("click", () => beginGyroCalibration(true));
       elements.orbitButton.addEventListener("click", toggleOrbit);
@@ -1183,9 +1748,15 @@
 
       document.addEventListener("fullscreenchange", () => {
         elements.fullscreenButton.setAttribute("aria-pressed", String(Boolean(document.fullscreenElement)));
+        if (panorama && viewState.mode === "streetview") {
+          setTimeout(() => google.maps.event.trigger(panorama, "resize"), 120);
+        }
       });
 
       window.addEventListener("orientationchange", () => {
+        if (panorama && viewState.mode === "streetview") {
+          setTimeout(() => google.maps.event.trigger(panorama, "resize"), 180);
+        }
         if (!gyro.active) return;
         gyro.reference = null;
         gyro.calibrationSamples = [];
@@ -1200,10 +1771,14 @@
     async function init() {
       bindUi();
       setSensorStatus("3D地図を読み込んでいます…", "idle");
-      const [{ Map3DElement }, { Geocoder }] = await Promise.all([
+      const [maps3dLibrary, { Geocoder }, streetViewLibrary] = await Promise.all([
         google.maps.importLibrary("maps3d"),
-        google.maps.importLibrary("geocoding")
+        google.maps.importLibrary("geocoding"),
+        google.maps.importLibrary("streetView")
       ]);
+      const { Map3DElement, Marker3DInteractiveElement } = maps3dLibrary;
+      const { StreetViewPanorama, StreetViewService } = streetViewLibrary;
+      Marker3DInteractiveElementClass = Marker3DInteractiveElement;
 
       const initial = cameraFromUrlOrStorage();
       map = new Map3DElement({
@@ -1221,6 +1796,23 @@
       map.description = "Google Earth風の3Dスポットカメラ";
       elements.mapShell.append(map);
       geocoder = new Geocoder();
+      streetViewService = new StreetViewService();
+      panorama = new StreetViewPanorama(elements.streetView, {
+        visible: false,
+        pov: { heading: 0, pitch: 0 },
+        zoom: 1,
+        addressControl: false,
+        fullscreenControl: false,
+        enableCloseButton: false,
+        panControl: false,
+        zoomControl: true,
+        linksControl: true,
+        clickToGo: true,
+        scrollwheel: true,
+        motionTracking: true,
+        motionTrackingControl: true,
+        showRoadLabels: true
+      });
 
       map.addEventListener("gmp-error", () => {
         showMapError("Google Cloudで Maps JavaScript API と課金が有効か、APIキーのウェブサイト制限が正しいか確認してください。");
@@ -1244,7 +1836,8 @@
       });
 
       updateReadout();
-      setSensorStatus("ジャイロをオンにすると端末の動きでカメラを操作できます", "idle");
+      setSensorStatus("Firebaseからスポットを読み込んでいます…", "idle");
+      void loadFirebaseSpots();
     }
 
     (bootstrap => {
