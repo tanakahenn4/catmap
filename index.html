@@ -854,6 +854,7 @@
     let panorama;
     let streetViewService;
     let Marker3DInteractiveElementClass;
+    let PinElementClass;
     let mapMarkers = [];
     let toastTimer;
     let orbiting = false;
@@ -1092,12 +1093,17 @@
         const marker = new Marker3DInteractiveElementClass({
           position: { lat: spot.lat, lng: spot.lng },
           altitudeMode: "CLAMP_TO_GROUND",
-          label: "🐈",
           title: `${spot.title}のストリートビューを開く`,
           sizePreserved: true,
           drawsWhenOccluded: true,
           zIndex: index + 1
         });
+        marker.append(new PinElementClass({
+          scale: 0.62,
+          background: "#9df8d3",
+          borderColor: "#184a3e",
+          glyphText: ""
+        }));
         marker.addEventListener("gmp-click", event => {
           event.stopPropagation();
           openStreetViewSpot(spot);
@@ -1771,14 +1777,16 @@
     async function init() {
       bindUi();
       setSensorStatus("3D地図を読み込んでいます…", "idle");
-      const [maps3dLibrary, { Geocoder }, streetViewLibrary] = await Promise.all([
+      const [maps3dLibrary, { Geocoder }, streetViewLibrary, { PinElement }] = await Promise.all([
         google.maps.importLibrary("maps3d"),
         google.maps.importLibrary("geocoding"),
-        google.maps.importLibrary("streetView")
+        google.maps.importLibrary("streetView"),
+        google.maps.importLibrary("marker")
       ]);
       const { Map3DElement, Marker3DInteractiveElement } = maps3dLibrary;
       const { StreetViewPanorama, StreetViewService } = streetViewLibrary;
       Marker3DInteractiveElementClass = Marker3DInteractiveElement;
+      PinElementClass = PinElement;
 
       const initial = cameraFromUrlOrStorage();
       map = new Map3DElement({
