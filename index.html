@@ -130,11 +130,14 @@
     }
 
     .street-view-back {
-      min-width: 98px;
-      height: 44px;
-      padding: 0 13px;
+      width: 44px;
+      min-width: 44px !important;
+      height: 44px !important;
+      padding: 0 !important;
       border-radius: 15px;
       cursor: pointer;
+      font-size: 20px;
+      line-height: 1;
     }
 
     .street-view-caption {
@@ -221,7 +224,7 @@
       left: max(12px, env(safe-area-inset-left));
       right: max(12px, env(safe-area-inset-right));
       display: grid;
-      grid-template-columns: auto minmax(180px, 560px) auto;
+      grid-template-columns: minmax(180px, 560px) auto;
       align-items: center;
       gap: 10px;
       pointer-events: none;
@@ -242,13 +245,7 @@
     }
 
     .brand {
-      min-height: 44px;
-      display: flex;
-      align-items: center;
-      gap: 9px;
-      padding: 0 13px;
-      border-radius: 15px;
-      white-space: nowrap;
+      display: none !important;
     }
 
     .brand-mark {
@@ -774,7 +771,7 @@
     </div>
 
     <div id="street-view-toolbar" class="street-view-toolbar">
-      <button id="street-view-back" class="street-view-back" type="button">↻ 地図を再読込</button>
+      <button id="street-view-back" class="street-view-back" type="button" aria-label="地図を再読み込み" title="地図を再読み込み">↻</button>
       <div class="street-view-caption" role="status" aria-live="polite">
         <strong id="street-view-title">スポット</strong>
         <span id="street-view-status">ストリートビューを準備しています…</span>
