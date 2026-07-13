@@ -1,1889 +1,592 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-  <meta name="theme-color" content="#05080b">
-  <title>EARTH SPOT CAMERA</title>
-  <style>
-    :root {
-      color-scheme: dark;
-      --ink: #f4f8fb;
-      --muted: rgba(235, 244, 249, 0.7);
-      --glass: rgba(8, 13, 17, 0.7);
-      --glass-strong: rgba(8, 13, 17, 0.9);
-      --line: rgba(255, 255, 255, 0.15);
-      --accent: #9df8d3;
-      --accent-strong: #42e5a5;
-      --danger: #ff9f9f;
-      --shadow: 0 12px 38px rgba(0, 0, 0, 0.35);
-    }
-
-    * {
-      box-sizing: border-box;
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    html,
-    body {
-      width: 100%;
-      height: 100%;
-      margin: 0;
-      overflow: hidden;
-      overscroll-behavior: none;
-      background: #05080b;
-      color: var(--ink);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Yu Gothic UI", sans-serif;
-    }
-
-    button,
-    input {
-      font: inherit;
-    }
-
-    button {
-      color: inherit;
-    }
-
-    #app,
-    #map-shell,
-    gmp-map-3d {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-    }
-
-    #app {
-      isolation: isolate;
-      background:
-        radial-gradient(circle at 50% 40%, rgba(53, 91, 96, 0.24), transparent 42%),
-        #05080b;
-    }
-
-    #map-shell {
-      z-index: 0;
-      touch-action: none;
-      transition: opacity 520ms ease;
-    }
-
-    #street-view-shell {
-      position: absolute;
-      z-index: 6;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background: #05080b;
-      opacity: 0;
-      transform: scale(1.018);
-      transition: opacity 520ms ease, transform 900ms cubic-bezier(0.2, 0.7, 0.2, 1);
-      pointer-events: none;
-    }
-
-    #street-view-shell.is-active {
-      opacity: 1;
-      transform: scale(1);
-      pointer-events: auto;
-    }
-
-    #street-view {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-    }
-
-    .street-view-toolbar {
-      position: absolute;
-      z-index: 20;
-      top: max(12px, env(safe-area-inset-top));
-      left: max(12px, env(safe-area-inset-left));
-      right: max(12px, env(safe-area-inset-right));
-      display: flex;
-      align-items: center;
-      gap: 9px;
-      opacity: 0;
-      transform: translateY(-8px);
-      transition: opacity 180ms ease, transform 180ms ease;
-      pointer-events: none;
-    }
-
-    body.spot-mode .street-view-toolbar {
-      opacity: 1;
-      transform: translateY(0);
-      pointer-events: auto;
-    }
-
-    .street-view-back,
-    .street-view-caption {
-      border: 1px solid var(--line);
-      background: var(--glass-strong);
-      box-shadow: var(--shadow);
-      backdrop-filter: blur(16px) saturate(125%);
-      -webkit-backdrop-filter: blur(16px) saturate(125%);
-    }
-
-    .street-view-back {
-      min-width: 98px;
-      height: 44px;
-      padding: 0 13px;
-      border-radius: 15px;
-      cursor: pointer;
-    }
-
-    .street-view-caption {
-      min-width: 0;
-      max-width: min(70vw, 540px);
-      min-height: 44px;
-      display: grid;
-      align-content: center;
-      gap: 2px;
-      padding: 6px 13px;
-      border-radius: 15px;
-    }
-
-    .street-view-caption strong,
-    .street-view-caption span {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .street-view-caption strong {
-      font-size: 12px;
-      letter-spacing: 0.04em;
-    }
-
-    .street-view-caption span {
-      color: var(--muted);
-      font-size: 10px;
-    }
-
-    .street-view-loading {
-      position: absolute;
-      z-index: 8;
-      top: calc(max(12px, env(safe-area-inset-top)) + 58px);
-      left: 50%;
-      max-width: min(86vw, 420px);
-      padding: 8px 13px;
-      border: 1px solid var(--line);
-      border-radius: 999px;
-      background: var(--glass-strong);
-      box-shadow: var(--shadow);
-      color: var(--muted);
-      font-size: 11px;
-      text-align: center;
-      opacity: 0;
-      transform: translate(-50%, 8px);
-      transition: opacity 180ms ease, transform 180ms ease;
-      pointer-events: none;
-    }
-
-    body.spot-mode:not(.street-view-ready) .street-view-loading {
-      opacity: 1;
-      transform: translate(-50%, 0);
-    }
-
-    body.spot-mode .topbar,
-    body.spot-mode .sensor-pill,
-    body.spot-mode .reticle,
-    body.spot-mode .hint,
-    body.spot-mode .dock {
-      opacity: 0;
-      pointer-events: none;
-    }
-
-    body.street-view-settled #map-shell {
-      visibility: hidden;
-    }
-
-    .topbar {
-      position: absolute;
-      z-index: 10;
-      top: max(12px, env(safe-area-inset-top));
-      left: max(12px, env(safe-area-inset-left));
-      right: max(12px, env(safe-area-inset-right));
-      display: grid;
-      grid-template-columns: auto minmax(180px, 560px) auto;
-      align-items: center;
-      gap: 10px;
-      pointer-events: none;
-      transition: opacity 180ms ease, transform 180ms ease;
-    }
-
-    .brand,
-    .search,
-    .camera-readout,
-    .dock,
-    .sensor-pill,
-    .hint {
-      border: 1px solid var(--line);
-      background: var(--glass);
-      box-shadow: var(--shadow);
-      backdrop-filter: blur(16px) saturate(125%);
-      -webkit-backdrop-filter: blur(16px) saturate(125%);
-    }
-
-    .brand {
-      min-height: 44px;
-      display: flex;
-      align-items: center;
-      gap: 9px;
-      padding: 0 13px;
-      border-radius: 15px;
-      white-space: nowrap;
-    }
-
-    .brand-mark {
-      width: 12px;
-      height: 12px;
-      border: 2px solid var(--accent);
-      border-radius: 50%;
-      box-shadow: 0 0 16px rgba(157, 248, 211, 0.8), inset 0 0 5px rgba(157, 248, 211, 0.5);
-    }
-
-    .brand-copy {
-      display: grid;
-      line-height: 1;
-    }
-
-    .brand-copy strong {
-      font-size: 12px;
-      letter-spacing: 0.16em;
-    }
-
-    .brand-copy small {
-      margin-top: 4px;
-      color: var(--muted);
-      font-size: 9px;
-      letter-spacing: 0.09em;
-    }
-
-    .search {
-      min-width: 0;
-      height: 46px;
-      display: flex;
-      align-items: center;
-      padding: 4px;
-      border-radius: 16px;
-      pointer-events: auto;
-    }
-
-    .search input {
-      min-width: 0;
-      flex: 1;
-      height: 36px;
-      padding: 0 12px;
-      border: 0;
-      outline: 0;
-      background: transparent;
-      color: #fff;
-      font-size: 14px;
-    }
-
-    .search input::placeholder {
-      color: rgba(235, 244, 249, 0.55);
-    }
-
-    .search button,
-    .icon-button,
-    .clean-exit {
-      display: inline-grid;
-      place-items: center;
-      border: 1px solid var(--line);
-      background: rgba(255, 255, 255, 0.08);
-      cursor: pointer;
-    }
-
-    .search button {
-      width: 38px;
-      height: 36px;
-      padding: 0;
-      border-radius: 12px;
-      font-size: 17px;
-    }
-
-    .camera-readout {
-      min-height: 44px;
-      display: grid;
-      grid-template-columns: repeat(2, auto);
-      align-content: center;
-      gap: 2px 10px;
-      padding: 6px 12px;
-      border-radius: 15px;
-      font-variant-numeric: tabular-nums;
-      white-space: nowrap;
-    }
-
-    .camera-readout span {
-      color: var(--muted);
-      font-size: 9px;
-      letter-spacing: 0.08em;
-    }
-
-    .camera-readout strong {
-      font-size: 11px;
-      font-weight: 600;
-    }
-
-    .sensor-pill {
-      position: absolute;
-      z-index: 10;
-      top: calc(max(12px, env(safe-area-inset-top)) + 58px);
-      left: 50%;
-      min-height: 28px;
-      max-width: min(86vw, 520px);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 7px;
-      padding: 5px 11px;
-      border-radius: 999px;
-      color: var(--muted);
-      font-size: 11px;
-      letter-spacing: 0.03em;
-      transform: translateX(-50%);
-      transition: opacity 180ms ease, transform 180ms ease;
-      pointer-events: none;
-    }
-
-    .sensor-dot {
-      width: 7px;
-      height: 7px;
-      flex: 0 0 auto;
-      border-radius: 50%;
-      background: #9aa5ab;
-      box-shadow: 0 0 0 3px rgba(154, 165, 171, 0.14);
-    }
-
-    .sensor-pill[data-tone="active"] .sensor-dot {
-      background: var(--accent-strong);
-      box-shadow: 0 0 0 3px rgba(66, 229, 165, 0.18), 0 0 14px rgba(66, 229, 165, 0.75);
-    }
-
-    .sensor-pill[data-tone="warn"] .sensor-dot {
-      background: #ffd084;
-      box-shadow: 0 0 0 3px rgba(255, 208, 132, 0.17);
-    }
-
-    .sensor-pill[data-tone="error"] .sensor-dot {
-      background: var(--danger);
-      box-shadow: 0 0 0 3px rgba(255, 159, 159, 0.16);
-    }
-
-    .reticle {
-      position: absolute;
-      z-index: 5;
-      top: 50%;
-      left: 50%;
-      width: 34px;
-      height: 34px;
-      opacity: 0.7;
-      transform: translate(-50%, -50%);
-      pointer-events: none;
-      transition: opacity 180ms ease;
-    }
-
-    .reticle::before,
-    .reticle::after {
-      content: "";
-      position: absolute;
-      background: rgba(255, 255, 255, 0.9);
-      box-shadow: 0 0 7px rgba(0, 0, 0, 0.75);
-    }
-
-    .reticle::before {
-      top: 16px;
-      left: 0;
-      width: 34px;
-      height: 1px;
-    }
-
-    .reticle::after {
-      top: 0;
-      left: 16px;
-      width: 1px;
-      height: 34px;
-    }
-
-    .hint {
-      position: absolute;
-      z-index: 8;
-      left: 50%;
-      bottom: calc(max(14px, env(safe-area-inset-bottom)) + 82px);
-      max-width: min(90vw, 520px);
-      padding: 7px 12px;
-      border-radius: 999px;
-      color: var(--muted);
-      font-size: 10px;
-      text-align: center;
-      transform: translateX(-50%);
-      pointer-events: none;
-      transition: opacity 180ms ease, transform 180ms ease;
-    }
-
-    .dock {
-      position: absolute;
-      z-index: 10;
-      left: 50%;
-      bottom: max(12px, env(safe-area-inset-bottom));
-      width: min(calc(100% - 24px), 680px);
-      display: grid;
-      grid-template-columns: repeat(7, minmax(50px, 1fr));
-      gap: 4px;
-      padding: 5px;
-      border-radius: 20px;
-      transform: translateX(-50%);
-      transition: opacity 180ms ease, transform 180ms ease;
-    }
-
-    .icon-button {
-      min-width: 0;
-      height: 58px;
-      grid-template-rows: 24px 14px;
-      gap: 2px;
-      padding: 5px 2px;
-      border-color: transparent;
-      border-radius: 15px;
-    }
-
-    .icon-button .icon {
-      font-size: 19px;
-      line-height: 1;
-    }
-
-    .icon-button .label {
-      overflow: hidden;
-      color: var(--muted);
-      font-size: 9px;
-      line-height: 1;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    button:active {
-      transform: scale(0.96);
-    }
-
-    button:focus-visible,
-    input:focus-visible {
-      outline: 2px solid var(--accent);
-      outline-offset: 2px;
-    }
-
-    .icon-button[aria-pressed="true"] {
-      border-color: rgba(157, 248, 211, 0.4);
-      background: rgba(66, 229, 165, 0.16);
-    }
-
-    .icon-button[aria-pressed="true"] .label {
-      color: var(--accent);
-    }
-
-    .icon-button:disabled {
-      cursor: default;
-      opacity: 0.35;
-    }
-
-    .toast {
-      position: absolute;
-      z-index: 30;
-      left: 50%;
-      bottom: calc(max(14px, env(safe-area-inset-bottom)) + 90px);
-      max-width: min(88vw, 480px);
-      padding: 10px 14px;
-      border: 1px solid var(--line);
-      border-radius: 13px;
-      background: var(--glass-strong);
-      box-shadow: var(--shadow);
-      color: #fff;
-      font-size: 12px;
-      text-align: center;
-      opacity: 0;
-      transform: translate(-50%, 10px);
-      transition: opacity 160ms ease, transform 160ms ease;
-      pointer-events: none;
-    }
-
-    .toast.is-visible {
-      opacity: 1;
-      transform: translate(-50%, 0);
-    }
-
-    .error-panel {
-      position: absolute;
-      z-index: 40;
-      top: 50%;
-      left: 50%;
-      width: min(calc(100% - 32px), 460px);
-      padding: 20px;
-      border: 1px solid rgba(255, 159, 159, 0.35);
-      border-radius: 20px;
-      background: var(--glass-strong);
-      box-shadow: var(--shadow);
-      text-align: center;
-      transform: translate(-50%, -50%);
-    }
-
-    .error-panel h2 {
-      margin: 0 0 8px;
-      font-size: 18px;
-    }
-
-    .error-panel p {
-      margin: 0;
-      color: var(--muted);
-      font-size: 13px;
-      line-height: 1.7;
-    }
-
-    .clean-exit {
-      position: absolute;
-      z-index: 25;
-      top: max(10px, env(safe-area-inset-top));
-      right: max(10px, env(safe-area-inset-right));
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 180ms ease;
-    }
-
-    body.clean-mode .topbar,
-    body.clean-mode .sensor-pill,
-    body.clean-mode .hint,
-    body.clean-mode .dock,
-    body.clean-mode .street-view-toolbar {
-      opacity: 0;
-      transform: translateY(8px);
-      pointer-events: none;
-    }
-
-    body.clean-mode .reticle {
-      opacity: 0;
-    }
-
-    body.clean-mode .clean-exit {
-      opacity: 0.36;
-      pointer-events: auto;
-    }
-
-    body.clean-mode .toast {
-      bottom: max(18px, env(safe-area-inset-bottom));
-    }
-
-    @media (hover: hover) {
-      .search button:hover,
-      .icon-button:hover,
-      .clean-exit:hover {
-        background: rgba(255, 255, 255, 0.15);
-      }
-    }
-
-    @media (max-width: 760px) {
-      .topbar {
-        grid-template-columns: 1fr auto;
-      }
-
-      .brand {
-        display: none;
-      }
-
-      .camera-readout {
-        padding-inline: 10px;
-      }
-
-      .dock {
-        grid-template-columns: repeat(7, minmax(42px, 1fr));
-      }
-
-      .icon-button {
-        height: 56px;
-      }
-    }
-
-    @media (max-width: 470px) {
-      .topbar {
-        grid-template-columns: minmax(0, 1fr) auto;
-        gap: 6px;
-      }
-
-      .search {
-        height: 43px;
-      }
-
-      .search input {
-        width: 100%;
-        height: 33px;
-        padding-inline: 9px;
-        font-size: 13px;
-      }
-
-      .search button {
-        width: 34px;
-        height: 33px;
-      }
-
-      .camera-readout {
-        min-height: 43px;
-        grid-template-columns: 1fr;
-        gap: 1px;
-      }
-
-      .camera-readout span:nth-of-type(2),
-      .camera-readout strong:nth-of-type(2) {
-        display: none;
-      }
-
-      .sensor-pill {
-        top: calc(max(12px, env(safe-area-inset-top)) + 53px);
-        font-size: 10px;
-      }
-
-      .dock {
-        width: calc(100% - 16px);
-        bottom: max(8px, env(safe-area-inset-bottom));
-        gap: 1px;
-        padding: 4px;
-        border-radius: 18px;
-      }
-
-      .icon-button {
-        height: 53px;
-        border-radius: 13px;
-      }
-
-      .icon-button .icon {
-        font-size: 17px;
-      }
-
-      .icon-button .label {
-        font-size: 8px;
-      }
-
-      .hint {
-        bottom: calc(max(8px, env(safe-area-inset-bottom)) + 70px);
-      }
-
-      .street-view-toolbar {
-        gap: 6px;
-      }
-
-      .street-view-back {
-        min-width: 88px;
-        height: 42px;
-        padding-inline: 10px;
-        font-size: 12px;
-      }
-
-      .street-view-caption {
-        min-height: 42px;
-        padding-inline: 10px;
-      }
-    }
-
-    @media (max-height: 520px) and (orientation: landscape) {
-      .topbar {
-        left: max(8px, env(safe-area-inset-left));
-        right: auto;
-        width: min(54vw, 520px);
-      }
-
-      .camera-readout,
-      .sensor-pill,
-      .hint {
-        display: none;
-      }
-
-      .dock {
-        left: auto;
-        right: max(8px, env(safe-area-inset-right));
-        bottom: 50%;
-        width: 58px;
-        grid-template-columns: 1fr;
-        transform: translateY(50%);
-      }
-
-      .icon-button {
-        height: 43px;
-        grid-template-rows: 1fr;
-      }
-
-      .icon-button .label {
-        display: none;
-      }
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      *,
-      *::before,
-      *::after {
-        scroll-behavior: auto !important;
-        transition-duration: 0.01ms !important;
-      }
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>全国猫図鑑Nekomap</title>
+<style>
+  html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    font-family: "Segoe UI", sans-serif;
+  }
+
+  #app {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    background: #000;
+  }
+
+  #app:fullscreen {
+    width: 100vw;
+    height: 100vh;
+  }
+
+  #map {
+    flex: 1;
+    min-height: 0;
+  }
+
+  #fullscreenButton {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 1001;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    margin: 0;
+    border: 0;
+    border-radius: 2px;
+    background: rgba(0,0,0,0.55);
+    color: #fff;
+    font-size: 22px;
+    line-height: 40px;
+    cursor: pointer;
+  }
+
+  #fullscreenButton:hover {
+    background: rgba(0,0,0,0.75);
+  }
+
+ #controls {
+    padding: 1px;
+    background: #444444;  /* 黒系ダーク */
+    border-top: 2px solid #ff44ef; /* 黒に近い境界線 */
+    color: #ffffff;  /* 文字を白に */
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+    box-sizing: border-box;
+}
+
+#compass-container {
+  position: absolute;
+  bottom: 80px;
+  left: 10px;
+  z-index: 1000;
+  width: 50px;
+  height: 50px;
+}
+
+#controls input,
+#controls textarea,
+#controls button {
+    background: #333;  /* 入力欄やボタンも暗めに */
+    color: #fff;       /* 文字白 */
+    border: 1px solid #a7a5a5; /* 薄い境界線 */
+}
+
+#controls button:hover {
+    background: #555;  /* ホバーで少し明るく */
+}
+
+  button, input {
+    padding: 6px 10px;
+    margin-right: 5px;
+    font-size: 14px;
+  }
+  textarea {
+    width: 100%;
+    height: 80px;
+    margin-top: 5px;
+    font-family: monospace;
+  }
+
+  #controls > strong,
+#jsonInput,
+#searchJsonButton {
+  display: none;
+}
+
+@font-face {
+  font-family: 'PopRumCute';
+  src: url('PopRumCute.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+#footer-label {
+  position: fixed;
+  left: 220px;
+  top: 11px;
+  color: #fff;               /* 文字色 */
+  background: rgba(0,0,0,0.5); /* 半透明黒背景 */
+  padding: 4px 8px;
+  border-radius: 8px;        /* 角丸 */
+  font-size: 20px;
+  
+  z-index: 1000;    
+  letter-spacing: 3px;         /* 地図やcontrolsより前面に表示 */
+}
+
+@media (max-width: 700px) {
+  #fullscreenButton {
+    width: 34px;
+    height: 34px;
+    font-size: 20px;
+    line-height: 34px;
+  }
+
+  #footer-label {
+    left: 50%;
+    top: 10px;
+    transform: translateX(-50%);
+    font-size: clamp(16px, 5vw, 24px);
+    letter-spacing: 2px;
+    white-space: nowrap;
+  }
+
+  #controls {
+    padding: 2px;
+    gap: 3px;
+    font-size: 12px;
+  }
+
+  #controls input,
+  #controls button {
+    height: 32px;
+    padding: 4px 8px;
+    margin-right: 0;
+    font-size: clamp(12px, 3.4vw, 16px);
+    box-sizing: border-box;
+  }
+
+  #addressInput {
+    flex: 1 1 180px;
+    min-width: 0;
+    width: auto !important;
+  }
+
+  #controls button {
+    flex: 0 0 auto;
+  }
+
+  #compass-container {
+    bottom: 92px;
+    width: 42px;
+    height: 42px;
+  }
+
+  #compass {
+    width: 42px;
+    height: 42px;
+  }
+}
+
+@media (max-width: 700px) and (orientation: portrait) {
+  #controls {
+    align-items: stretch;
+  }
+
+  #controls > div:first-child {
+    flex: 0 0 auto;
+  }
+
+  #addressInput {
+    flex-basis: calc(100% - 120px);
+  }
+}
+
+@media (max-width: 700px) and (orientation: landscape) {
+  #controls input,
+  #controls button {
+    height: 30px;
+    font-size: clamp(12px, 2vw, 15px);
+  }
+
+  #footer-label {
+    font-size: clamp(16px, 3vw, 22px);
+  }
+}
+
+
+</style>
 </head>
+
 <body>
-  <main id="app">
-    <div id="map-shell" aria-label="Google 3D map"></div>
-    <div id="street-view-shell" aria-hidden="true">
-      <div id="street-view" aria-label="ストリートビュー"></div>
-    </div>
 
-    <div id="street-view-toolbar" class="street-view-toolbar">
-      <button id="street-view-back" class="street-view-back" type="button">← 地図へ戻る</button>
-      <div class="street-view-caption" role="status" aria-live="polite">
-        <strong id="street-view-title">スポット</strong>
-        <span id="street-view-status">ストリートビューを準備しています…</span>
-      </div>
-    </div>
-    <div class="street-view-loading">3D地図からストリートビューへ移動しています…</div>
+<div id="app">
+<div id="map"></div>
+<button id="fullscreenButton" type="button" title="全画面表示" aria-label="全画面表示">⛶</button>
 
-    <div class="topbar">
-      <div class="brand" aria-hidden="true">
-        <span class="brand-mark"></span>
-        <span class="brand-copy">
-          <strong>EARTH SPOT</strong>
-          <small>GYRO CAMERA</small>
-        </span>
-      </div>
+<div id="controls">
+  <div id="footer-label">全国猫図鑑  </div> 
+  <!-- JSON系を上に -->
+  <strong>登録データ(JSON):</strong>
+  <textarea id="jsonInput" placeholder='{"lat":35.681167,"lng":139.767052,"heading":120,"pitch":5,"zoom":1,"pano":"panoid"}'></textarea>
+  <button id="searchJsonButton">JSONから再現</button>
+  <!-- <br><br> -->
+  <!-- 住所入力系を下に -->
+  <input id="addressInput" type="text" placeholder="住所または pano ID を入力" style="width:40%">
+  <button id="searchAddressButton">住所 / Pano ID 検索</button>
+  <button id="getPosButton">現在位置を登録</button>
+  
+  <button id="loadDataButton">ページ更新</button>
+</div>
 
-      <form id="search-form" class="search" role="search">
-        <input id="search-input" type="search" enterkeyhint="search" autocomplete="off"
-          placeholder="場所名・住所・緯度,経度" aria-label="場所を検索">
-        <button type="submit" aria-label="検索">⌕</button>
-      </form>
+<div id="compass-container">
+  <svg id="compass" width="50" height="50" viewBox="0 0 50 50">
+    <!-- 外円 -->
+    <circle cx="25" cy="25" r="24" stroke="#fff" stroke-width="2" fill="rgba(0,0,0,0.5)" />
+    <!-- 赤い矢印（北） -->
+    <polygon id="compass-arrow" points="25,5 20,25 30,25" fill="red" />
+  </svg>
+</div>
+</div>
 
-      <div class="camera-readout" aria-live="polite">
-        <span>方角</span><span>高度</span>
-        <strong id="heading-value">000°</strong><strong id="range-value">—</strong>
-      </div>
-    </div>
 
-    <div id="sensor-pill" class="sensor-pill" data-tone="idle" role="status" aria-live="polite">
-      <span class="sensor-dot"></span>
-      <span id="sensor-text">地図を準備しています…</span>
-    </div>
+<script>
+let map, panorama, geocoder;
+let markers = [];
+let resetZoomOnEnter = true;
+const STORAGE_KEY = "catsmap_markers";
 
-    <div class="reticle" aria-hidden="true"></div>
-    <div id="gesture-hint" class="hint">1本指で移動・2本指で角度・ピンチで高度を調整</div>
 
-    <nav class="dock" aria-label="カメラ操作">
-      <button id="gyro-button" class="icon-button" type="button" aria-pressed="false">
-        <span class="icon">◉</span><span class="label">ジャイロ</span>
-      </button>
-      <button id="calibrate-button" class="icon-button" type="button" disabled>
-        <span class="icon">⊕</span><span class="label">基準</span>
-      </button>
-      <button id="orbit-button" class="icon-button" type="button" aria-pressed="false">
-        <span class="icon">↻</span><span class="label">旋回</span>
-      </button>
-      <button id="locate-button" class="icon-button" type="button">
-        <span class="icon">⌖</span><span class="label">現在地</span>
-      </button>
-      <button id="share-button" class="icon-button" type="button">
-        <span class="icon">↗</span><span class="label">リンク</span>
-      </button>
-      <button id="clean-button" class="icon-button" type="button" aria-pressed="false">
-        <span class="icon">●</span><span class="label">収録</span>
-      </button>
-      <button id="fullscreen-button" class="icon-button" type="button" aria-pressed="false">
-        <span class="icon">⛶</span><span class="label">全画面</span>
-      </button>
-    </nav>
 
-    <button id="clean-exit" class="clean-exit" type="button" aria-label="収録モードを終了">×</button>
-    <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <section id="error-panel" class="error-panel" hidden>
-      <h2>3D地図を表示できません</h2>
-      <p id="error-message"></p>
-    </section>
-  </main>
+let lastPanoramaPos = { lat: 35.6812, lng: 139.7671 }; // 初期中心（東京駅）
 
-  <script>
-    const API_KEY = "AIzaSyB5kbAl74HZzz9TbQSNakdeG9XMc-8EVeI";
-    const STORAGE_KEY = "earth_spot_camera_v1";
-    const FIREBASE_CONFIG = {
-      apiKey: "AIzaSyC_HyYwQMwfODX15o5HXjw7aYSPnuaFTOg",
-      authDomain: "nekocatsmap.firebaseapp.com",
-      projectId: "nekocatsmap",
-      storageBucket: "nekocatsmap.firebasestorage.app",
-      messagingSenderId: "247582443573",
-      appId: "1:247582443573:web:078b7acb7e0bd7ca81897c"
+function initMap() {
+  const initialCenter = { lat: 35.6812, lng: 139.7671 };
+  map = new google.maps.Map(document.getElementById("map"), {
+    center: initialCenter,
+    zoom: 7,
+    fullscreenControl: false
+  });
+  panorama = map.getStreetView();
+  panorama.setOptions({ fullscreenControl: false });
+  panorama.setVisible(false);
+  geocoder = new google.maps.Geocoder();
+
+  loadSavedMarkers();
+  setupFullscreenButton();
+
+    panorama.addListener('pov_changed', () => {
+    const heading = panorama.getPov().heading;
+    const arrow = document.getElementById('compass-arrow');
+    if (arrow) {
+      arrow.setAttribute('transform', `rotate(${-heading},25,25)`);
+    }
+    updateMarkerIconSizes();
+  });
+
+  panorama.addListener("visible_changed", () => {
+    if (panorama.getVisible()) {
+   if (resetZoomOnEnter) {
+    panorama.setPov({ heading: 0, pitch: 0, zoom: 1 });
+}
+    } else {
+      const center = lastPanoramaPos;
+      map.setCenter(center);
+      map.setZoom(20);
+      resetZoomOnEnter = true;
+    }
+  });
+
+  panorama.addListener("position_changed", () => {
+    const pos = panorama.getPosition();
+    if (pos) lastPanoramaPos = { lat: pos.lat(), lng: pos.lng() };
+    updateMarkerIconSizes();
+  });
+
+  document.getElementById("getPosButton").addEventListener("click", () => {
+    if (!panorama.getVisible()) return alert("ストリートビューが表示されていません。");
+    const pos = panorama.getPosition();
+    const pov = panorama.getPov();
+    const panoId = panorama.getPano();
+    const jsonData = {
+      lat: pos.lat(),
+      lng: pos.lng(),
+      heading: pov.heading,
+      pitch: pov.pitch,
+      zoom: pov.zoom,
+      pano: panoId
     };
-    const DEFAULT_CAMERA = {
-      center: { lat: 35.65858, lng: 139.74543, altitude: 40 },
-      range: 1250,
-      heading: 18,
-      tilt: 68,
-      roll: 0
-    };
+    addMarker(jsonData, true);
+    saveMarkers();
+  });
 
-    const elements = {
-      mapShell: document.getElementById("map-shell"),
-      streetViewShell: document.getElementById("street-view-shell"),
-      streetView: document.getElementById("street-view"),
-      streetViewToolbar: document.getElementById("street-view-toolbar"),
-      streetViewBack: document.getElementById("street-view-back"),
-      streetViewTitle: document.getElementById("street-view-title"),
-      streetViewStatus: document.getElementById("street-view-status"),
-      searchForm: document.getElementById("search-form"),
-      searchInput: document.getElementById("search-input"),
-      headingValue: document.getElementById("heading-value"),
-      rangeValue: document.getElementById("range-value"),
-      sensorPill: document.getElementById("sensor-pill"),
-      sensorText: document.getElementById("sensor-text"),
-      gyroButton: document.getElementById("gyro-button"),
-      calibrateButton: document.getElementById("calibrate-button"),
-      orbitButton: document.getElementById("orbit-button"),
-      locateButton: document.getElementById("locate-button"),
-      shareButton: document.getElementById("share-button"),
-      cleanButton: document.getElementById("clean-button"),
-      fullscreenButton: document.getElementById("fullscreen-button"),
-      cleanExit: document.getElementById("clean-exit"),
-      toast: document.getElementById("toast"),
-      errorPanel: document.getElementById("error-panel"),
-      errorMessage: document.getElementById("error-message")
-    };
+  document.getElementById("searchAddressButton").addEventListener("click", async () => {
+    const input = document.getElementById("addressInput").value.trim();
+    if (!input) return alert("住所または pano ID を入力してください。");
 
-    let map;
-    let geocoder;
-    let panorama;
-    let streetViewService;
-    let Marker3DInteractiveElementClass;
-    let PinElementClass;
-    let mapMarkers = [];
-    let toastTimer;
-    let orbiting = false;
-    let saveTimer;
-
-    const viewState = {
-      mode: "map",
-      token: 0,
-      returnCamera: null,
-      resumeMapGyro: false,
-      selectedSpot: null
-    };
-
-    const resolvedPanoCache = new Map();
-
-    const gyro = {
-      active: false,
-      sample: null,
-      reference: null,
-      calibrationSamples: [],
-      targetHeading: DEFAULT_CAMERA.heading,
-      targetTilt: DEFAULT_CAMERA.tilt,
-      userInteracting: false,
-      frameId: 0,
-      lastFrameTime: 0,
-      waitingTimer: 0
-    };
-
-    function clamp(value, min, max) {
-      return Math.min(max, Math.max(min, value));
-    }
-
-    function normalize360(value) {
-      return ((value % 360) + 360) % 360;
-    }
-
-    function shortestAngle(value) {
-      return ((value + 540) % 360) - 180;
-    }
-
-    function finiteNumber(value, fallback) {
-      const number = Number(value);
-      return Number.isFinite(number) ? number : fallback;
-    }
-
-    function currentCamera() {
-      if (!map) return structuredClone(DEFAULT_CAMERA);
-      const center = map.center || DEFAULT_CAMERA.center;
-      return {
-        center: {
-          lat: finiteNumber(center.lat ?? center.latitude, DEFAULT_CAMERA.center.lat),
-          lng: finiteNumber(center.lng ?? center.longitude, DEFAULT_CAMERA.center.lng),
-          altitude: finiteNumber(center.altitude, 0)
-        },
-        range: finiteNumber(map.range, DEFAULT_CAMERA.range),
-        heading: normalize360(finiteNumber(map.heading, DEFAULT_CAMERA.heading)),
-        tilt: clamp(finiteNumber(map.tilt, DEFAULT_CAMERA.tilt), 0, 90),
-        roll: finiteNumber(map.roll, 0)
-      };
-    }
-
-    function cameraFromUrlOrStorage() {
-      const params = new URLSearchParams(location.search);
-      const hasUrlCamera = params.has("lat") && params.has("lng");
-      let stored = null;
-
-      try {
-        stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
-      } catch (error) {
-        console.warn("保存済みカメラ情報を読み込めませんでした", error);
-      }
-
-      const source = hasUrlCamera ? {
-        center: {
-          lat: params.get("lat"),
-          lng: params.get("lng"),
-          altitude: params.get("alt")
-        },
-        range: params.get("range"),
-        heading: params.get("heading"),
-        tilt: params.get("tilt")
-      } : stored;
-
-      if (!source) return structuredClone(DEFAULT_CAMERA);
-
-      const camera = {
-        center: {
-          lat: finiteNumber(source.center?.lat, DEFAULT_CAMERA.center.lat),
-          lng: finiteNumber(source.center?.lng, DEFAULT_CAMERA.center.lng),
-          altitude: finiteNumber(source.center?.altitude, DEFAULT_CAMERA.center.altitude)
-        },
-        range: clamp(finiteNumber(source.range, DEFAULT_CAMERA.range), 30, 20000000),
-        heading: normalize360(finiteNumber(source.heading, DEFAULT_CAMERA.heading)),
-        tilt: clamp(finiteNumber(source.tilt, DEFAULT_CAMERA.tilt), 0, 90),
-        roll: 0
-      };
-
-      if (Math.abs(camera.center.lat) > 90 || Math.abs(camera.center.lng) > 180) {
-        return structuredClone(DEFAULT_CAMERA);
-      }
-      return camera;
-    }
-
-    function updateReadout() {
-      if (!map) return;
-      const camera = currentCamera();
-      elements.headingValue.textContent = `${String(Math.round(camera.heading)).padStart(3, "0")}°`;
-      elements.rangeValue.textContent = camera.range >= 1000
-        ? `${(camera.range / 1000).toFixed(camera.range >= 10000 ? 0 : 1)} km`
-        : `${Math.round(camera.range)} m`;
-    }
-
-    function scheduleSaveCamera() {
-      if (viewState.mode !== "map") return;
-      clearTimeout(saveTimer);
-      saveTimer = setTimeout(() => {
-        try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(currentCamera()));
-        } catch (error) {
-          console.warn("カメラ情報を保存できませんでした", error);
-        }
-      }, 250);
-    }
-
-    function setSensorStatus(message, tone = "idle") {
-      elements.sensorText.textContent = message;
-      elements.sensorPill.dataset.tone = tone;
-    }
-
-    function showToast(message, duration = 2200) {
-      clearTimeout(toastTimer);
-      elements.toast.textContent = message;
-      elements.toast.classList.add("is-visible");
-      toastTimer = setTimeout(() => elements.toast.classList.remove("is-visible"), duration);
-    }
-
-    function showMapError(message) {
-      elements.errorMessage.textContent = message;
-      elements.errorPanel.hidden = false;
-      setSensorStatus("地図の読み込みに失敗しました", "error");
-    }
-
-    function parseCoordinates(value) {
-      const match = value.trim().match(/^\s*(-?\d+(?:\.\d+)?)\s*[,、\s]\s*(-?\d+(?:\.\d+)?)\s*$/);
-      if (!match) return null;
-      const lat = Number(match[1]);
-      const lng = Number(match[2]);
-      if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
-        return null;
-      }
-      return { lat, lng };
-    }
-
-    function flyToLocation(position, range = 1200) {
-      if (!map) return;
-      const wasGyroActive = gyro.active;
-      if (wasGyroActive) gyro.userInteracting = true;
-      map.stopCameraAnimation();
-      map.flyCameraTo({
-        endCamera: {
-          center: { lat: position.lat, lng: position.lng, altitude: 20 },
-          range,
-          heading: currentCamera().heading,
-          tilt: 68,
-          roll: 0
-        },
-        durationMillis: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 2200
-      });
-
-      if (wasGyroActive) {
-        setTimeout(() => {
-          gyro.userInteracting = false;
-          beginGyroCalibration(false);
-        }, 2350);
-      }
-    }
-
-    async function searchLocation(event) {
-      event.preventDefault();
-      const query = elements.searchInput.value.trim();
-      if (!query || !map || !geocoder) return;
-
-      const coordinates = parseCoordinates(query);
-      if (coordinates) {
-        flyToLocation(coordinates);
-        elements.searchInput.blur();
-        showToast("指定した座標へ移動します");
-        return;
-      }
-
-      setSensorStatus("場所を検索しています…", "idle");
-      try {
-        const response = await geocoder.geocode({ address: query, region: "JP" });
-        const result = response.results?.[0];
-        if (!result) throw new Error("ZERO_RESULTS");
-        const position = result.geometry.location.toJSON();
-        flyToLocation(position);
-        elements.searchInput.value = result.formatted_address || query;
-        elements.searchInput.blur();
-        showToast("検索した場所へ移動します");
-        setSensorStatus(gyro.active ? "ジャイロ操作中" : "ジャイロをオンにすると端末の動きでカメラを操作できます", gyro.active ? "active" : "idle");
-      } catch (error) {
-        console.warn("場所を検索できませんでした", error);
-        showToast("場所が見つかりませんでした");
-        setSensorStatus("場所名・住所または緯度,経度を入力してください", "warn");
-      }
-    }
-
-    function normalizeSpot(raw, index) {
-      if (!raw || typeof raw !== "object") return null;
-      const lat = finiteNumber(raw.lat, NaN);
-      const lng = finiteNumber(raw.lng, NaN);
-      if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
-        return null;
-      }
-
-      const pano = typeof raw.pano === "string" ? raw.pano.trim() : "";
-      const titleSource = raw.title || raw.name || raw.label;
-      return {
-        id: String(raw.id || `spot-${index + 1}`),
-        title: typeof titleSource === "string" && titleSource.trim() ? titleSource.trim() : `スポット ${index + 1}`,
-        lat,
-        lng,
-        pano,
-        heading: normalize360(finiteNumber(raw.heading, 0)),
-        pitch: clamp(finiteNumber(raw.pitch, 0), -90, 90),
-        zoom: clamp(finiteNumber(raw.zoom, 1), 0, 5)
-      };
-    }
-
-    function renderSpotMarkers(spots) {
-      mapMarkers.forEach(marker => marker.remove());
-      mapMarkers = [];
-
-      spots.forEach((spot, index) => {
-        const marker = new Marker3DInteractiveElementClass({
-          position: { lat: spot.lat, lng: spot.lng },
-          altitudeMode: "CLAMP_TO_GROUND",
-          title: `${spot.title}のストリートビューを開く`,
-          sizePreserved: true,
-          drawsWhenOccluded: true,
-          zIndex: index + 1
-        });
-        marker.append(new PinElementClass({
-          scale: 0.62,
-          background: "#9df8d3",
-          borderColor: "#184a3e",
-          glyphText: ""
-        }));
-        marker.addEventListener("gmp-click", event => {
-          event.stopPropagation();
-          openStreetViewSpot(spot);
-        });
-        map.append(marker);
-        mapMarkers.push(marker);
-      });
-    }
-
-    function shouldAutoFrameSpots() {
-      const params = new URLSearchParams(location.search);
-      if (params.has("lat") && params.has("lng")) return false;
-      try {
-        return !localStorage.getItem(STORAGE_KEY);
-      } catch {
-        return true;
-      }
-    }
-
-    function distanceMeters(a, b) {
-      const radius = 6371000;
-      const toRadians = value => value * Math.PI / 180;
-      const dLat = toRadians(b.lat - a.lat);
-      const dLng = toRadians(b.lng - a.lng);
-      const latA = toRadians(a.lat);
-      const latB = toRadians(b.lat);
-      const value = Math.sin(dLat / 2) ** 2
-        + Math.cos(latA) * Math.cos(latB) * Math.sin(dLng / 2) ** 2;
-      return 2 * radius * Math.asin(Math.sqrt(value));
-    }
-
-    function frameSpotMarkers(spots) {
-      if (!spots.length || !map) return;
-      if (!shouldAutoFrameSpots()) {
-        const camera = currentCamera();
-        const nearest = spots.reduce(
-          (minimum, spot) => Math.min(minimum, distanceMeters(camera.center, spot)),
-          Number.POSITIVE_INFINITY
-        );
-        if (nearest <= Math.max(camera.range * 1.4, 3000)) return;
-      }
-      const center = spots.reduce((sum, spot) => ({
-        lat: sum.lat + spot.lat / spots.length,
-        lng: sum.lng + spot.lng / spots.length
-      }), { lat: 0, lng: 0 });
-      const farthest = spots.reduce((max, spot) => Math.max(max, distanceMeters(center, spot)), 0);
-      const range = spots.length === 1
-        ? 2200
-        : clamp(farthest * 2.2, 5000, 3200000);
-      map.flyCameraTo({
-        endCamera: {
-          center: { ...center, altitude: 0 },
-          range,
-          heading: 0,
-          tilt: spots.length === 1 ? 58 : 28,
-          roll: 0
-        },
-        durationMillis: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 1600
-      });
-    }
-
-    async function loadFirebaseSpots() {
-      setSensorStatus("Firebaseからスポットを読み込んでいます…", "idle");
-      try {
-        const [firebaseAppModule, firestoreModule] = await Promise.all([
-          import("https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js"),
-          import("https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js")
-        ]);
-        const firebaseApp = firebaseAppModule.getApps().length
-          ? firebaseAppModule.getApp()
-          : firebaseAppModule.initializeApp(FIREBASE_CONFIG);
-        const db = firestoreModule.getFirestore(firebaseApp);
-        const markerSnapshot = await firestoreModule.getDoc(
-          firestoreModule.doc(db, "catsmap", "markers")
-        );
-
-        const records = markerSnapshot.exists() && Array.isArray(markerSnapshot.data().items)
-          ? markerSnapshot.data().items
-          : [];
-
-        const spots = records.map(normalizeSpot).filter(Boolean);
-        renderSpotMarkers(spots);
-        frameSpotMarkers(spots);
-        if (spots.length) {
-          setSensorStatus(`${spots.length}件のスポットを表示中・猫ピンをタップしてください`, "active");
-        } else {
-          setSensorStatus("Firebaseに表示できるスポットがありません", "warn");
-        }
-      } catch (error) {
-        console.warn("Firebaseのスポットを読み込めませんでした", error);
-        setSensorStatus("スポットを読み込めませんでした。3D地図はそのまま操作できます", "warn");
-        showToast("Firebaseの読み取り権限または通信状態を確認してください", 3400);
-      }
-    }
-
-    function delay(milliseconds) {
-      return new Promise(resolve => setTimeout(resolve, milliseconds));
-    }
-
-    function cancelledTransitionError() {
-      const error = new Error("transition-cancelled");
-      error.cancelled = true;
-      return error;
-    }
-
-    async function resolveSpotPanorama(spot) {
-      const cacheKey = `${spot.pano}|${spot.lat.toFixed(6)}|${spot.lng.toFixed(6)}`;
-      const cached = resolvedPanoCache.get(cacheKey);
-      if (cached) return cached;
-
-      if (spot.pano) {
-        try {
-          const response = await streetViewService.getPanorama({ pano: spot.pano });
-          const location = response.data?.location;
-          if (location?.pano) {
-            const result = { pano: location.pano, fallbackUsed: false };
-            resolvedPanoCache.set(cacheKey, result);
-            return result;
-          }
-        } catch (error) {
-          console.info("保存済みPano IDが無効なため位置から再検索します", error);
-        }
-      }
-
-      for (const radius of [120, 500]) {
-        try {
-          const response = await streetViewService.getPanorama({
-            location: { lat: spot.lat, lng: spot.lng },
-            radius,
-            preference: "nearest"
-          });
-          const location = response.data?.location;
-          if (location?.pano) {
-            const result = { pano: location.pano, fallbackUsed: true };
-            resolvedPanoCache.set(cacheKey, result);
-            return result;
-          }
-        } catch (error) {
-          console.info(`${radius}m以内にストリートビューが見つかりません`, error);
-        }
-      }
-      throw new Error("STREET_VIEW_NOT_FOUND");
-    }
-
-    function waitForPanorama(spot, resolved, token) {
-      return new Promise((resolve, reject) => {
-        if (token !== viewState.token || viewState.mode !== "entering") {
-          reject(cancelledTransitionError());
-          return;
-        }
-        let finished = false;
-        let targetStatusReceived = panorama.getPano() === resolved.pano && panorama.getStatus() === "OK";
-        const listeners = [];
-        let timeoutId;
-        let graceTimer;
-
-        const cleanup = () => {
-          listeners.forEach(listener => listener.remove());
-          clearTimeout(timeoutId);
-          clearTimeout(graceTimer);
-        };
-        const fail = error => {
-          if (finished) return;
-          finished = true;
-          cleanup();
-          reject(error);
-        };
-        const succeed = () => {
-          if (finished) return;
-          if (token !== viewState.token) return fail(cancelledTransitionError());
-          finished = true;
-          cleanup();
-          panorama.setPov({ heading: spot.heading, pitch: spot.pitch });
-          panorama.setZoom(spot.zoom);
-          graceTimer = setTimeout(() => resolve(resolved), 260);
-        };
-        const checkStatus = fromStatusEvent => {
-          if (token !== viewState.token) return fail(cancelledTransitionError());
-          if (fromStatusEvent) targetStatusReceived = true;
-          const status = panorama.getStatus();
-          if (targetStatusReceived && status === "OK" && panorama.getPano() === resolved.pano) succeed();
-          if (status === "ZERO_RESULTS") fail(new Error("STREET_VIEW_NOT_FOUND"));
-        };
-
-        listeners.push(panorama.addListener("status_changed", () => checkStatus(true)));
-        timeoutId = setTimeout(() => fail(new Error("STREET_VIEW_TIMEOUT")), 8500);
-
-        panorama.setMotionTracking(false);
+    try {
+      const result = await geocoder.geocode({ address: input });
+      if (result.results && result.results.length > 0) {
+        const loc = result.results[0].geometry.location;
+        map.setCenter(loc);
+        panorama.setPosition(loc);
+        panorama.setPov({ heading: 0, pitch: 0, zoom: 1 });
         panorama.setVisible(true);
-        google.maps.event.trigger(panorama, "resize");
-        panorama.setPano(resolved.pano);
-        panorama.setPov({ heading: spot.heading, pitch: spot.pitch });
-        panorama.setZoom(spot.zoom);
-        setTimeout(() => checkStatus(false), 120);
-      });
-    }
-
-    function animateMapCamera(endCamera, durationMillis) {
-      return new Promise(resolve => {
-        if (!map) return resolve();
-        let finished = false;
-        let timeoutId;
-        const finish = () => {
-          if (finished) return;
-          finished = true;
-          clearTimeout(timeoutId);
-          map.removeEventListener("gmp-animationend", onAnimationEnd);
-          resolve();
-        };
-        const onAnimationEnd = () => finish();
-        map.addEventListener("gmp-animationend", onAnimationEnd);
-        map.flyCameraTo({ endCamera, durationMillis });
-        timeoutId = setTimeout(finish, Math.max(300, durationMillis + 1200));
-        if (durationMillis === 0) setTimeout(finish, 80);
-      });
-    }
-
-    async function openStreetViewSpot(spot) {
-      if (!map || !panorama || viewState.mode !== "map") return;
-      const token = ++viewState.token;
-      viewState.mode = "entering";
-      viewState.returnCamera = currentCamera();
-      viewState.resumeMapGyro = gyro.active;
-      viewState.selectedSpot = spot;
-
-      if (gyro.active) stopGyro(false);
-      if (orbiting) {
-        orbiting = false;
-        elements.orbitButton.setAttribute("aria-pressed", "false");
-      }
-      map.stopCameraAnimation();
-      document.body.classList.add("spot-mode");
-      document.body.classList.remove("street-view-ready", "street-view-settled");
-      elements.streetViewTitle.textContent = spot.title;
-      elements.streetViewStatus.textContent = "Pano IDを確認しながら地上へ移動しています…";
-      elements.streetViewShell.classList.remove("is-active");
-      elements.streetViewShell.setAttribute("aria-hidden", "true");
-      await delay(70);
-      if (token !== viewState.token) return;
-
-      const duration = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 2400;
-      const flight = animateMapCamera({
-        center: { lat: spot.lat, lng: spot.lng, altitude: 0 },
-        range: 85,
-        heading: spot.heading,
-        tilt: 78,
-        roll: 0
-      }, duration);
-      const panoramaReady = resolveSpotPanorama(spot)
-        .then(resolved => {
-          if (token !== viewState.token || viewState.mode !== "entering") {
-            throw cancelledTransitionError();
-          }
-          return waitForPanorama(spot, resolved, token);
-        });
-
-      try {
-        const [, resolved] = await Promise.all([flight, panoramaReady]);
-        if (token !== viewState.token) return;
-        viewState.mode = "streetview";
-        elements.streetViewStatus.textContent = resolved.fallbackUsed
-          ? "Pano IDが変わったため、近くの最新画像を表示しています"
-          : "端末を動かして周囲を見渡せます";
-        elements.streetViewShell.setAttribute("aria-hidden", "false");
-        elements.streetViewShell.classList.add("is-active");
-        document.body.classList.add("street-view-ready");
-        google.maps.event.trigger(panorama, "resize");
-        panorama.setPov({ heading: spot.heading, pitch: spot.pitch });
-        panorama.setZoom(spot.zoom);
-        panorama.setMotionTracking(true);
-        panorama.focus();
-        if (resolved.fallbackUsed) showToast("保存されたPano IDが変わったため、緯度経度から再検索しました", 3500);
-        setTimeout(() => {
-          if (token === viewState.token && viewState.mode === "streetview") {
-            document.body.classList.add("street-view-settled");
-          }
-        }, 560);
-      } catch (error) {
-        if (token !== viewState.token || error.cancelled) return;
-        console.warn("ストリートビューへ移動できませんでした", error);
-        viewState.mode = "recovering";
-        panorama.setVisible(false);
-        elements.streetViewShell.classList.remove("is-active");
-        document.body.classList.remove("street-view-ready", "street-view-settled");
-        elements.streetViewStatus.textContent = "表示できないため見下ろし地図へ戻っています…";
-        showToast("このスポットのストリートビューを表示できませんでした", 3400);
-        setSensorStatus("ストリートビューが見つかりません。別のピンを試してください", "warn");
-        map.stopCameraAnimation();
-        await delay(70);
-        if (token !== viewState.token) return;
-        if (viewState.returnCamera) {
-          await animateMapCamera(viewState.returnCamera, duration ? 1300 : 0);
-        }
-        if (token !== viewState.token) return;
-        document.body.classList.remove("spot-mode");
-        viewState.mode = "map";
-        viewState.returnCamera = null;
-        viewState.selectedSpot = null;
-        updateReadout();
-        scheduleSaveCamera();
-        if (viewState.resumeMapGyro) void startGyro();
-      }
-    }
-
-    async function closeStreetView() {
-      if (viewState.mode === "map" || viewState.mode === "leaving") return;
-      const wasVisible = viewState.mode === "streetview";
-      const returnCamera = viewState.returnCamera;
-      const resumeMapGyro = viewState.resumeMapGyro;
-      const token = ++viewState.token;
-      viewState.mode = "leaving";
-
-      document.body.classList.remove("street-view-settled", "street-view-ready");
-      elements.streetViewStatus.textContent = "見下ろし地図へ戻っています…";
-      elements.streetViewShell.classList.remove("is-active");
-      elements.streetViewShell.setAttribute("aria-hidden", "true");
-      panorama.setMotionTracking(false);
-      await delay(wasVisible ? 540 : 80);
-      if (token !== viewState.token) return;
-      panorama.setVisible(false);
-      document.body.classList.remove("spot-mode");
-
-      if (returnCamera) {
-        map.stopCameraAnimation();
-        await delay(70);
-        const duration = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 1500;
-        await animateMapCamera(returnCamera, duration);
-      }
-      if (token !== viewState.token) return;
-      viewState.mode = "map";
-      viewState.returnCamera = null;
-      viewState.selectedSpot = null;
-      updateReadout();
-      scheduleSaveCamera();
-      setSensorStatus("猫ピンをタップするとストリートビューへ移動します", "active");
-      if (resumeMapGyro) void startGyro();
-    }
-
-    function readOrientation(event) {
-      const alpha = finiteNumber(event.alpha, NaN);
-      const beta = finiteNumber(event.beta, NaN);
-      const gamma = finiteNumber(event.gamma, NaN);
-      if (![alpha, beta, gamma].every(Number.isFinite)) return null;
-
-      const radians = Math.PI / 180;
-      const degrees = 180 / Math.PI;
-      const a = alpha * radians;
-      const b = beta * radians;
-      const g = gamma * radians;
-      const ca = Math.cos(a);
-      const sa = Math.sin(a);
-      const cb = Math.cos(b);
-      const sb = Math.sin(b);
-      const cg = Math.cos(g);
-      const sg = Math.sin(g);
-
-      // W3Cの Z-X'-Y'' 回転から、画面の背面方向（見ている方向）を求める。
-      // 端末の縦持ち／横持ちを軸の入れ替えで扱わず、物理的な向きとして扱える。
-      const fx = -ca * sg - sa * sb * cg;
-      const fy = -sa * sg + ca * sb * cg;
-      const fz = -cb * cg;
-      const horizontal = Math.hypot(fx, fy);
-
-      return {
-        heading: horizontal > 0.2 ? normalize360(Math.atan2(fx, fy) * degrees) : null,
-        elevation: Math.atan2(fz, horizontal) * degrees,
-        horizontal
-      };
-    }
-
-    function circularMean(values) {
-      if (!values.length) return null;
-      let x = 0;
-      let y = 0;
-      values.forEach(value => {
-        x += Math.cos(value * Math.PI / 180);
-        y += Math.sin(value * Math.PI / 180);
-      });
-      return normalize360(Math.atan2(y, x) * 180 / Math.PI);
-    }
-
-    function tryFinishGyroCalibration() {
-      const samples = gyro.calibrationSamples.slice(-10);
-      if (samples.length < 10 || !map) return false;
-      const elevation = samples.reduce((sum, sample) => sum + sample.elevation, 0) / samples.length;
-      const headings = samples.map(sample => sample.heading).filter(Number.isFinite);
-      const heading = circularMean(headings);
-      const pitchStable = samples.every(sample => Math.abs(sample.elevation - elevation) < 3.5);
-      const headingStable = heading === null || headings.every(value => Math.abs(shortestAngle(value - heading)) < 7);
-      if (!pitchStable || !headingStable) {
-        setSensorStatus("端末を一瞬静止してください…", "warn");
-        return false;
-      }
-
-      const camera = currentCamera();
-      gyro.reference = {
-        sensorHeading: heading,
-        sensorElevation: elevation,
-        mapHeading: camera.heading,
-        mapTilt: camera.tilt
-      };
-      gyro.targetHeading = camera.heading;
-      gyro.targetTilt = camera.tilt;
-      gyro.calibrationSamples = [];
-      clearTimeout(gyro.waitingTimer);
-      setSensorStatus(heading === null
-        ? "傾きのみジャイロ操作中・端末を少し起こすと左右も反応します"
-        : "ジャイロ操作中・センサー情報は端末内だけで処理します", "active");
-      return true;
-    }
-
-    function handleOrientation(event) {
-      if (!gyro.active) return;
-      const sample = readOrientation(event);
-      if (!sample) return;
-
-      gyro.sample = sample;
-      if (!gyro.reference) {
-        gyro.calibrationSamples.push(sample);
-        if (gyro.calibrationSamples.length > 20) gyro.calibrationSamples.shift();
-        tryFinishGyroCalibration();
-      }
-
-      if (!gyro.reference) return;
-      if (Number.isFinite(sample.heading) && Number.isFinite(gyro.reference.sensorHeading)) {
-        const headingDelta = shortestAngle(sample.heading - gyro.reference.sensorHeading);
-        gyro.targetHeading = normalize360(gyro.reference.mapHeading + headingDelta * 0.95);
-      }
-      const tiltDelta = sample.elevation - gyro.reference.sensorElevation;
-      gyro.targetTilt = clamp(gyro.reference.mapTilt + tiltDelta * 0.75, 15, 88);
-    }
-
-    function animateGyro(time) {
-      if (!gyro.active) return;
-      gyro.frameId = requestAnimationFrame(animateGyro);
-      if (!map || !gyro.reference || gyro.userInteracting || document.hidden) return;
-      if (time - gyro.lastFrameTime < 32) return;
-      gyro.lastFrameTime = time;
-
-      const camera = currentCamera();
-      const headingStep = shortestAngle(gyro.targetHeading - camera.heading) * 0.18;
-      const tiltStep = (gyro.targetTilt - camera.tilt) * 0.18;
-      if (Math.abs(headingStep) > 0.025) map.heading = normalize360(camera.heading + headingStep);
-      if (Math.abs(tiltStep) > 0.025) map.tilt = clamp(camera.tilt + tiltStep, 15, 88);
-      updateReadout();
-    }
-
-    function beginGyroCalibration(withToast = true) {
-      if (!gyro.active || !map) {
-        if (withToast) showToast("ジャイロをオンにしてから基準を合わせてください");
         return;
       }
-      gyro.reference = null;
-      gyro.calibrationSamples = [];
-      setSensorStatus("現在の持ち方を基準にします。端末を一瞬静止してください…", "warn");
-      if (withToast) showToast("現在の持ち方を新しい基準にします");
+    } catch (e) {
+      console.warn("住所検索エラー:", e);
     }
 
-    async function startGyro() {
-      if (!("DeviceOrientationEvent" in window)) {
-        setSensorStatus("この端末／ブラウザはジャイロ操作に対応していません", "error");
-        showToast("ジャイロセンサーを利用できません");
-        return;
+    panorama.setPano(input);
+    panorama.setPov({ heading: 0, pitch: 0, zoom: 1 });
+    panorama.setVisible(true);
+  });
+
+  document.getElementById("searchJsonButton").addEventListener("click", () => {
+    try {
+      const data = JSON.parse(document.getElementById("jsonInput").value);
+      if (!data.lat || !data.lng) return alert("JSONに必要な情報がありません。");
+      showPanorama(data);
+    } catch {
+      alert("正しいJSONを入力してください。");
+    }
+  });
+
+  document.getElementById("loadDataButton").addEventListener("click", () => {
+    markers.forEach(m => m.setMap(null));
+    markers = [];
+    loadSavedMarkers();
+  });
+
+  window.addEventListener("resize", () => {
+    updateMarkerIconSizes();
+  });
+}
+
+function setupFullscreenButton() {
+  const app = document.getElementById("app");
+  const button = document.getElementById("fullscreenButton");
+  if (!app || !button) return;
+
+  button.addEventListener("click", async () => {
+    try {
+      if (document.fullscreenElement === app) {
+        await document.exitFullscreen();
+      } else {
+        await app.requestFullscreen();
       }
+    } catch (e) {
+      console.warn("全画面表示の切り替えに失敗しました:", e);
+    }
+  });
 
-      if (!window.isSecureContext) {
-        setSensorStatus("ジャイロはHTTPSで公開したページで利用できます", "warn");
-        showToast("HTTPSのページで開いてください", 3200);
-        return;
-      }
+  document.addEventListener("fullscreenchange", () => {
+    const isFullscreen = document.fullscreenElement === app;
+    button.textContent = isFullscreen ? "×" : "⛶";
+    button.title = isFullscreen ? "全画面を終了" : "全画面表示";
+    button.setAttribute("aria-label", button.title);
 
-      try {
-        if (typeof DeviceOrientationEvent.requestPermission === "function") {
-          const permission = await DeviceOrientationEvent.requestPermission();
-          if (permission !== "granted") throw new Error("permission-denied");
-        }
+    setTimeout(() => {
+      const center = map && map.getCenter ? map.getCenter() : null;
+      if (map) google.maps.event.trigger(map, "resize");
+      if (center) map.setCenter(center);
+      updateMarkerIconSizes();
+    }, 100);
+  });
+}
 
-        map.stopCameraAnimation();
-        orbiting = false;
-        elements.orbitButton.setAttribute("aria-pressed", "false");
-        gyro.active = true;
-        gyro.sample = null;
-        gyro.reference = null;
-        gyro.calibrationSamples = [];
-        gyro.userInteracting = false;
-        elements.gyroButton.setAttribute("aria-pressed", "true");
-        elements.calibrateButton.disabled = false;
-        setSensorStatus("端末を楽な位置で持ってください…", "warn");
-        window.addEventListener("deviceorientation", handleOrientation, { passive: true });
-        cancelAnimationFrame(gyro.frameId);
-        gyro.frameId = requestAnimationFrame(animateGyro);
-        clearTimeout(gyro.waitingTimer);
-        gyro.waitingTimer = setTimeout(() => {
-          if (gyro.active && !gyro.sample) {
-            setSensorStatus("センサー信号が届きません。ブラウザの権限を確認してください", "error");
-          }
-        }, 2200);
-      } catch (error) {
-        console.warn("ジャイロを開始できませんでした", error);
-        setSensorStatus("センサーの使用が許可されませんでした", "error");
-        showToast("ブラウザ設定でモーションと方向へのアクセスを許可してください", 3400);
-      }
+function getCatMarkerSize(jsonData = {}) {
+  const width = window.innerWidth || document.documentElement.clientWidth || 1024;
+  const baseSize = Math.max(50, Math.min(60, width * 0.1));
+  let zoomScale = 1;
+  let distanceScale = 1;
+
+  if (panorama && panorama.getVisible()) {
+    const currentZoom = Number(panorama.getPov().zoom);
+    const registeredZoom = 1;
+
+    if (Number.isFinite(currentZoom) && Number.isFinite(registeredZoom)) {
+      const zoomDelta = currentZoom - registeredZoom;
+      zoomScale = Math.pow(1.5, zoomDelta);
     }
 
-    function stopGyro(showMessage = true) {
-      gyro.active = false;
-      gyro.sample = null;
-      gyro.reference = null;
-      gyro.calibrationSamples = [];
-      gyro.userInteracting = false;
-      clearTimeout(gyro.waitingTimer);
-      cancelAnimationFrame(gyro.frameId);
-      window.removeEventListener("deviceorientation", handleOrientation);
-      elements.gyroButton.setAttribute("aria-pressed", "false");
-      elements.calibrateButton.disabled = true;
-      setSensorStatus("ジャイロはオフです", "idle");
-      if (showMessage) showToast("ジャイロ操作を終了しました");
-    }
+    distanceScale = getCatDistanceScale(jsonData);
+  }
 
-    async function toggleGyro() {
-      if (gyro.active) stopGyro();
-      else await startGyro();
-    }
+  const size = Math.round(Math.max(32, Math.min(360, baseSize * zoomScale * distanceScale)));
+  return new google.maps.Size(size, size);
+}
 
-    function handleMapInteractionStart() {
-      if (!gyro.active) return;
-      gyro.userInteracting = true;
-    }
+function getCatDistanceScale(jsonData = {}) {
+  const pos = panorama && panorama.getPosition ? panorama.getPosition() : null;
+  if (!pos) return 1;
 
-    function handleMapInteractionEnd() {
-      if (!gyro.active) return;
-      clearTimeout(handleMapInteractionEnd.timer);
-      handleMapInteractionEnd.timer = setTimeout(() => {
-        gyro.userInteracting = false;
-        beginGyroCalibration(false);
-      }, 320);
-    }
+  const distance = getDistanceMeters(
+    { lat: pos.lat(), lng: pos.lng() },
+    { lat: jsonData.lat, lng: jsonData.lng }
+  );
 
-    function toggleOrbit() {
-      if (!map) return;
-      if (orbiting) {
-        map.stopCameraAnimation();
-        orbiting = false;
-        elements.orbitButton.setAttribute("aria-pressed", "false");
-        showToast("自動旋回を停止しました");
-        return;
-      }
+  if (!Number.isFinite(distance)) return 1;
 
-      if (gyro.active) stopGyro(false);
-      orbiting = true;
-      elements.orbitButton.setAttribute("aria-pressed", "true");
-      setSensorStatus("ゆっくり自動旋回しています", "active");
-      const camera = currentCamera();
-      map.flyCameraAround({
-        camera: {
-          center: camera.center,
-          range: camera.range,
-          tilt: Math.max(55, camera.tilt),
-          heading: camera.heading,
-          roll: 0
-        },
-        durationMillis: 24000,
-        repeatCount: 1
-      });
-    }
+  const scale = Math.sqrt(28 / Math.max(distance, 1));
+  return Math.max(0.45, Math.min(5.9, scale));
+}
 
-    function locateUser() {
-      if (!navigator.geolocation) {
-        showToast("現在地を取得できないブラウザです");
-        return;
-      }
-      setSensorStatus("現在地を確認しています…", "idle");
-      navigator.geolocation.getCurrentPosition(
-        position => {
-          flyToLocation({ lat: position.coords.latitude, lng: position.coords.longitude }, 1800);
-          setSensorStatus(gyro.active ? "ジャイロ操作中" : "現在地へ移動しました", gyro.active ? "active" : "idle");
-        },
-        error => {
-          console.warn("現在地を取得できませんでした", error);
-          setSensorStatus("現在地の使用が許可されていません", "warn");
-          showToast("ブラウザ設定で位置情報を許可してください");
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
-      );
-    }
+function getDistanceMeters(a, b) {
+  const latA = Number(a.lat);
+  const lngA = Number(a.lng);
+  const latB = Number(b.lat);
+  const lngB = Number(b.lng);
+  if (![latA, lngA, latB, lngB].every(Number.isFinite)) return NaN;
 
-    function cameraShareUrl() {
-      const camera = currentCamera();
-      const url = new URL(location.href);
-      url.search = "";
-      url.searchParams.set("lat", camera.center.lat.toFixed(6));
-      url.searchParams.set("lng", camera.center.lng.toFixed(6));
-      url.searchParams.set("alt", Math.round(camera.center.altitude));
-      url.searchParams.set("range", Math.round(camera.range));
-      url.searchParams.set("heading", camera.heading.toFixed(1));
-      url.searchParams.set("tilt", camera.tilt.toFixed(1));
-      return url.href;
-    }
+  const earthRadius = 6371000;
+  const toRad = value => value * Math.PI / 180;
+  const dLat = toRad(latB - latA);
+  const dLng = toRad(lngB - lngA);
+  const rLatA = toRad(latA);
+  const rLatB = toRad(latB);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(rLatA) * Math.cos(rLatB) * Math.sin(dLng / 2) ** 2;
 
-    async function copyCameraLink() {
-      const url = cameraShareUrl();
-      try {
-        await navigator.clipboard.writeText(url);
-        showToast("現在のカメラ位置のリンクをコピーしました");
-      } catch (error) {
-        console.warn("リンクをコピーできませんでした", error);
-        window.prompt("現在のカメラ位置のリンク", url);
-      }
-    }
+  return 2 * earthRadius * Math.asin(Math.sqrt(h));
+}
 
-    function setCleanMode(enabled) {
-      document.body.classList.toggle("clean-mode", enabled);
-      elements.cleanButton.setAttribute("aria-pressed", String(enabled));
-      if (enabled) showToast("収録モード：右上の×で操作画面に戻ります", 1800);
-    }
+function getCatMarkerIcon(jsonData = {}) {
+  const scaledSize = getCatMarkerSize(jsonData);
 
-    async function toggleFullscreen() {
-      const app = document.getElementById("app");
-      try {
-        if (document.fullscreenElement) {
-          await document.exitFullscreen();
-        } else if (app.requestFullscreen) {
-          await app.requestFullscreen();
-        } else {
-          showToast("ブラウザの共有／メニューから全画面表示を選んでください", 3200);
-        }
-      } catch (error) {
-        console.warn("全画面表示を切り替えられませんでした", error);
-        showToast("このブラウザでは全画面表示を開始できませんでした");
+  return {
+    url: "https://cdn-icons-png.flaticon.com/512/1864/1864514.png",
+    scaledSize,
+   anchor: new google.maps.Point(
+  scaledSize.width / 2,
+  scaledSize.height * 0.95
+)
+  };
+}
+
+function updateMarkerIconSizes() {
+  if (!window.google || !google.maps) return;
+
+  markers.forEach(marker => {
+    marker.setIcon(getCatMarkerIcon(marker.jsonData));
+  });
+}
+
+function addMarker(jsonData, focus = false) {
+  const marker = new google.maps.Marker({
+    position: { lat: jsonData.lat, lng: jsonData.lng },
+    map: map,
+    title: "🐈 猫発見！",
+    icon: getCatMarkerIcon(jsonData)
+  });
+  marker.jsonData = jsonData;
+
+  // 🐾 クリックイベントで判定
+ const meowSound = new Audio('meow.mp3'); // 同じフォルダに置いた音声ファイル
+
+marker.addListener("click", (e) => {
+  if (e.domEvent.shiftKey) {
+    if (confirm("この猫マーカーを削除しますか？🐈")) {
+      if (confirm("本当に削除しますか？🙀")) {
+        marker.setMap(null);
+        markers = markers.filter(m => m !== marker);
+        saveMarkers();
       }
     }
+  } else {
+    // 普通のクリック → ストリートビュー
+    showPanorama(jsonData);
 
-    function bindUi() {
-      elements.searchForm.addEventListener("submit", searchLocation);
-      elements.streetViewBack.addEventListener("click", closeStreetView);
-      elements.gyroButton.addEventListener("click", toggleGyro);
-      elements.calibrateButton.addEventListener("click", () => beginGyroCalibration(true));
-      elements.orbitButton.addEventListener("click", toggleOrbit);
-      elements.locateButton.addEventListener("click", locateUser);
-      elements.shareButton.addEventListener("click", copyCameraLink);
-      elements.cleanButton.addEventListener("click", () => setCleanMode(true));
-      elements.cleanExit.addEventListener("click", () => setCleanMode(false));
-      elements.fullscreenButton.addEventListener("click", toggleFullscreen);
+    // 猫の鳴き声再生
+    meowSound.currentTime = 0; // 何度もクリックできるように先頭に戻す
+    meowSound.play();
+  }
+});
 
-      elements.mapShell.addEventListener("pointerdown", handleMapInteractionStart, { passive: true });
-      window.addEventListener("pointerup", handleMapInteractionEnd, { passive: true });
-      window.addEventListener("pointercancel", handleMapInteractionEnd, { passive: true });
 
-      document.addEventListener("fullscreenchange", () => {
-        elements.fullscreenButton.setAttribute("aria-pressed", String(Boolean(document.fullscreenElement)));
-        if (panorama && viewState.mode === "streetview") {
-          setTimeout(() => google.maps.event.trigger(panorama, "resize"), 120);
-        }
-      });
 
-      window.addEventListener("orientationchange", () => {
-        if (panorama && viewState.mode === "streetview") {
-          setTimeout(() => google.maps.event.trigger(panorama, "resize"), 180);
-        }
-        if (!gyro.active) return;
-        gyro.reference = null;
-        gyro.calibrationSamples = [];
-        setTimeout(() => beginGyroCalibration(false), 500);
-      });
+  markers.push(marker);
+  if (focus) map.setCenter(marker.getPosition());
+}
 
-      document.addEventListener("visibilitychange", () => {
-        if (!document.hidden && gyro.active) beginGyroCalibration(false);
-      });
+function showPanorama(data) {
+  resetZoomOnEnter = false;
+  if (data.pano) panorama.setPano(data.pano);
+  else panorama.setPosition({ lat: data.lat, lng: data.lng });
+  panorama.setPov({
+    heading: data.heading,
+    pitch: data.pitch,
+    zoom: data.zoom
+  });
+  panorama.setVisible(true);
+  updateMarkerIconSizes();
+}
+
+async function saveMarkers() {
+  const data = markers.map(m => m.jsonData);
+
+  await window.firebaseSetDoc(
+    window.firebaseDoc(window.firebaseDB, "catsmap", "markers"),
+    {
+      items: data,
+      updatedAt: new Date().toISOString()
     }
+  );
 
-    async function init() {
-      bindUi();
-      setSensorStatus("3D地図を読み込んでいます…", "idle");
-      const [maps3dLibrary, { Geocoder }, streetViewLibrary, { PinElement }] = await Promise.all([
-        google.maps.importLibrary("maps3d"),
-        google.maps.importLibrary("geocoding"),
-        google.maps.importLibrary("streetView"),
-        google.maps.importLibrary("marker")
-      ]);
-      const { Map3DElement, Marker3DInteractiveElement } = maps3dLibrary;
-      const { StreetViewPanorama, StreetViewService } = streetViewLibrary;
-      Marker3DInteractiveElementClass = Marker3DInteractiveElement;
-      PinElementClass = PinElement;
+  console.log("✅ Firestore保存完了", data);
+}
 
-      const initial = cameraFromUrlOrStorage();
-      map = new Map3DElement({
-        center: initial.center,
-        range: initial.range,
-        heading: initial.heading,
-        tilt: initial.tilt,
-        roll: 0,
-        mode: "SATELLITE",
-        gestureHandling: "GREEDY",
-        defaultUIHidden: true,
-        minTilt: 0,
-        maxTilt: 90
-      });
-      map.description = "Google Earth風の3Dスポットカメラ";
-      elements.mapShell.append(map);
-      geocoder = new Geocoder();
-      streetViewService = new StreetViewService();
-      panorama = new StreetViewPanorama(elements.streetView, {
-        visible: false,
-        pov: { heading: 0, pitch: 0 },
-        zoom: 1,
-        addressControl: false,
-        fullscreenControl: false,
-        enableCloseButton: false,
-        panControl: false,
-        zoomControl: true,
-        linksControl: true,
-        clickToGo: true,
-        scrollwheel: true,
-        motionTracking: true,
-        motionTrackingControl: true,
-        showRoadLabels: true
-      });
+async function loadSavedMarkers() {
+  // Firebaseの準備待ち
+  while (!window.firebaseDB || !window.firebaseGetDoc || !window.firebaseDoc) {
+    console.log("⏳ Firebase準備待ち...");
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
 
-      map.addEventListener("gmp-error", () => {
-        showMapError("Google Cloudで Maps JavaScript API と課金が有効か、APIキーのウェブサイト制限が正しいか確認してください。");
-      });
-      map.addEventListener("gmp-headingchange", updateReadout);
-      map.addEventListener("gmp-rangechange", updateReadout);
-      map.addEventListener("gmp-steadychange", event => {
-        if (event.isSteady) {
-          updateReadout();
-          scheduleSaveCamera();
-        }
-      });
-      map.addEventListener("gmp-animationend", () => {
-        if (orbiting) {
-          orbiting = false;
-          elements.orbitButton.setAttribute("aria-pressed", "false");
-          setSensorStatus("自動旋回が完了しました", "idle");
-        }
-        updateReadout();
-        scheduleSaveCamera();
-      });
+  const snap = await window.firebaseGetDoc(
+    window.firebaseDoc(window.firebaseDB, "catsmap", "markers")
+  );
 
-      updateReadout();
-      setSensorStatus("Firebaseからスポットを読み込んでいます…", "idle");
-      void loadFirebaseSpots();
-    }
+  if (!snap.exists()) {
+    console.log("🐾 Firestoreに保存データはまだありません");
+    return;
+  }
 
-    (bootstrap => {
-      let promise;
-      let script;
-      let key;
-      const product = "The Google Maps JavaScript API";
-      const namespace = "google";
-      const importName = "importLibrary";
-      const callbackName = "__ib__";
-      const documentRef = document;
-      const windowRef = window;
-      const googleRef = windowRef[namespace] || (windowRef[namespace] = {});
-      const mapsRef = googleRef.maps || (googleRef.maps = {});
-      const libraries = new Set();
-      const params = new URLSearchParams();
-      const load = () => promise || (promise = new Promise(async (resolve, reject) => {
-        script = await documentRef.createElement("script");
-        params.set("libraries", [...libraries] + "");
-        for (key in bootstrap) {
-          params.set(key.replace(/[A-Z]/g, letter => `_${letter[0].toLowerCase()}`), bootstrap[key]);
-        }
-        params.set("callback", `${namespace}.maps.${callbackName}`);
-        script.src = `https://maps.${namespace}apis.com/maps/api/js?${params}`;
-        mapsRef[callbackName] = resolve;
-        script.onerror = () => reject(new Error(`${product} could not load.`));
-        script.nonce = documentRef.querySelector("script[nonce]")?.nonce || "";
-        documentRef.head.append(script);
-      }));
-      mapsRef[importName]
-        ? console.warn(`${product} only loads once. Ignoring:`, bootstrap)
-        : mapsRef[importName] = (library, ...args) => libraries.add(library) && load().then(() => mapsRef[importName](library, ...args));
-    })({ key: API_KEY, v: "weekly", language: "ja", region: "JP" });
+  const data = snap.data().items || [];
+  data.forEach(d => addMarker(d));
 
-    init().catch(error => {
-      console.error(error);
-      showMapError("通信状態とAPIキーの設定を確認してください。ジャイロ操作にはHTTPSでの公開が必要です。");
-    });
-  </script>
+  if (data.length) {
+    console.log(`🐾 ${data.length} 件の猫をFirestoreから復元しました`);
+  }
+}
+
+
+
+</script>
+
+<script async
+  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB5kbAl74HZzz9TbQSNakdeG9XMc-8EVeI&callback=initMap">
+</script>
+
+
+
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
+import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyC_HyYwQMwfODX15o5HXjw7aYSPnuaFTOg",
+  authDomain: "nekocatsmap.firebaseapp.com",
+  projectId: "nekocatsmap",
+  storageBucket: "nekocatsmap.firebasestorage.app",
+  messagingSenderId: "247582443573",
+  appId: "1:247582443573:web:078b7acb7e0bd7ca81897c"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+window.firebaseDB = db;
+window.firebaseDoc = doc;
+window.firebaseSetDoc = setDoc;
+window.firebaseGetDoc = getDoc;
+
+console.log("🔥 Firebase接続成功");
+</script>
+
+
 </body>
 </html>
