@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
   <meta name="theme-color" content="#05080b">
-  <title>EARTH SPOT CAMERA</title>
+  <title>EARTH SPOT CAMERA - NO 3D BACKGROUND TEST</title>
   <style>
     :root {
       color-scheme: dark;
@@ -741,20 +741,20 @@
     </div>
 
     <div id="street-view-toolbar" class="street-view-toolbar">
-      <button id="street-view-back" class="street-view-back" type="button">← 地図へ戻る</button>
+      <button id="street-view-back" class="street-view-back" type="button">↻ 地図を再読込</button>
       <div class="street-view-caption" role="status" aria-live="polite">
         <strong id="street-view-title">スポット</strong>
         <span id="street-view-status">ストリートビューを準備しています…</span>
       </div>
     </div>
-    <div class="street-view-loading">3D地図からストリートビューへ移動しています…</div>
+    <div class="street-view-loading">3D地図を終了してストリートビューを準備しています…</div>
 
     <div class="topbar">
       <div class="brand" aria-hidden="true">
         <span class="brand-mark"></span>
         <span class="brand-copy">
           <strong>EARTH SPOT</strong>
-          <small>GYRO CAMERA</small>
+          <small>NO 3D BACKGROUND TEST</small>
         </span>
       </div>
 
@@ -1361,6 +1361,25 @@
       });
     }
 
+    function destroyOverviewMapForStreetView() {
+      if (!map) return;
+      const targetMap = map;
+      clearTimeout(saveTimer);
+      try {
+        targetMap.stopCameraAnimation();
+      } catch (error) {
+        console.info("3D地図のアニメーションはすでに終了しています", error);
+      }
+      mapMarkers.forEach(marker => marker.remove());
+      mapMarkers = [];
+      map = null;
+      targetMap.remove();
+      elements.mapShell.replaceChildren();
+      elements.mapShell.classList.add("is-rendering-paused");
+      elements.mapShell.setAttribute("aria-hidden", "true");
+      viewState.mapRenderingPaused = true;
+    }
+
     function pauseOverviewRendering() {
       if (!map || viewState.mapRenderingPaused) return;
       map.stopCameraAnimation();
@@ -1443,17 +1462,19 @@
         tilt: 78,
         roll: 0
       }, duration);
-      const panoramaReady = resolveSpotPanorama(spot)
-        .then(resolved => {
-          if (token !== viewState.token || viewState.mode !== "entering") {
-            throw cancelledTransitionError();
-          }
-          return waitForPanorama(spot, resolved, token);
-        });
+      const panoramaResolution = resolveSpotPanorama(spot);
 
       try {
-        const [, resolved] = await Promise.all([flight, panoramaReady]);
-        if (token !== viewState.token) return;
+        const [, resolved] = await Promise.all([flight, panoramaResolution]);
+        if (token !== viewState.token || viewState.mode !== "entering") return;
+
+        // A/B検証版では、Street Viewを描画する前に3D地図をDOMから完全に取り外す。
+        destroyOverviewMapForStreetView();
+        await delay(80);
+        if (token !== viewState.token || viewState.mode !== "entering") return;
+
+        await waitForPanorama(spot, resolved, token);
+        if (token !== viewState.token || viewState.mode !== "entering") return;
         viewState.mode = "streetview";
         elements.streetViewStatus.textContent = resolved.fallbackUsed
           ? "Pano IDが変わったため、近くの最新画像を表示しています"
@@ -1468,7 +1489,6 @@
           if (token === viewState.token && viewState.mode === "streetview") {
             document.body.classList.add("street-view-ready");
             document.body.classList.add("street-view-settled");
-            pauseOverviewRendering();
             panorama.setMotionTracking(true);
             panorama.focus();
             setTimeout(() => {
@@ -1481,85 +1501,22 @@
       } catch (error) {
         if (token !== viewState.token || error.cancelled) return;
         console.warn("ストリートビューへ移動できませんでした", error);
-        viewState.mode = "recovering";
+        viewState.mode = "streetview-error";
+        panorama.setMotionTracking(false);
         panorama.setVisible(false);
         elements.streetViewShell.classList.remove("is-active");
-        document.body.classList.remove("street-view-ready", "street-view-settled");
-        elements.streetViewStatus.textContent = "表示できないため見下ろし地図へ戻っています…";
-        showToast("このスポットのストリートビューを表示できませんでした", 3400);
-        setSensorStatus("ストリートビューが見つかりません。別のピンを試してください", "warn");
-        map.stopCameraAnimation();
-        await delay(70);
-        if (token !== viewState.token) return;
-        if (viewState.returnCamera) {
-          await animateMapCamera(viewState.returnCamera, duration ? 1300 : 0);
-        }
-        if (token !== viewState.token) return;
-        document.body.classList.remove("spot-mode");
-        viewState.mode = "map";
-        viewState.returnCamera = null;
-        viewState.selectedSpot = null;
-        updateReadout();
-        scheduleSaveCamera();
-        if (viewState.resumeMapGyro) void startGyro();
+        elements.streetViewShell.setAttribute("aria-hidden", "true");
+        document.body.classList.add("street-view-ready");
+        document.body.classList.remove("street-view-settled");
+        elements.streetViewStatus.textContent = "表示できませんでした。再読み込みしてください";
+        elements.streetViewBack.textContent = "↻ 再読み込み";
+        showToast("このスポットを表示できませんでした。再読み込みしてください", 4200);
       }
     }
 
-    async function closeStreetView() {
-      if (viewState.mode === "map" || viewState.mode === "leaving") return;
-      const wasVisible = viewState.mode === "streetview";
-      const returnCamera = viewState.returnCamera;
-      const resumeMapGyro = viewState.resumeMapGyro;
-      const token = ++viewState.token;
-      viewState.mode = "leaving";
-
-      document.body.classList.remove("street-view-settled");
-      elements.streetViewStatus.textContent = "見下ろし地図へ戻っています…";
-      panorama.setMotionTracking(false);
-
-      if (map && !viewState.mapRenderingPaused) map.stopCameraAnimation();
-      if (wasVisible && viewState.mapRenderingPaused) {
-        let resumed = false;
-        try {
-          resumed = await resumeOverviewRendering(token);
-        } catch (error) {
-          console.warn("3D地図の描画を再開できませんでした", error);
-          if (map) map.removeAttribute("mode");
-        }
-        if (token !== viewState.token) return;
-        if (!resumed) {
-          viewState.mode = "streetview";
-          document.body.classList.add("street-view-ready", "street-view-settled");
-          elements.streetViewStatus.textContent = "3D地図を再開できませんでした。もう一度お試しください";
-          panorama.setMotionTracking(true);
-          panorama.focus();
-          showToast("地図へ戻れませんでした。通信状態を確認してもう一度お試しください", 3600);
-          return;
-        }
-      }
-
-      elements.streetViewShell.classList.remove("is-active");
-      elements.streetViewShell.setAttribute("aria-hidden", "true");
-      await delay(wasVisible ? 540 : 80);
-      if (token !== viewState.token) return;
-      panorama.setVisible(false);
-      document.body.classList.remove("spot-mode", "street-view-ready", "street-view-settled");
-
-      if (returnCamera) {
-        map.stopCameraAnimation();
-        await delay(70);
-        const duration = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 1500;
-        await animateMapCamera(returnCamera, duration);
-      }
-      if (token !== viewState.token) return;
-      viewState.mode = "map";
-      viewState.returnCamera = null;
-      viewState.selectedSpot = null;
-      viewState.resumeMapGyro = false;
-      updateReadout();
-      scheduleSaveCamera();
-      setSensorStatus("ピンをタップするとストリートビューへ移動します", "active");
-      if (resumeMapGyro) void startGyro();
+    function closeStreetView() {
+      if (panorama) panorama.setMotionTracking(false);
+      location.reload();
     }
 
     function readOrientation(event) {
