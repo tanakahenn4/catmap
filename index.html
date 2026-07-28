@@ -65,6 +65,7 @@
       box-shadow:0 12px 36px rgba(0,0,0,.24);
     }
     .menuBtn::before{content:"";color:rgba(255,255,255,.88)}
+    .fullscreenBtn{display:none}
     .seekHud{
       position:fixed;left:50%;bottom:42px;z-index:9;transform:translateX(-50%);
       width:min(82vw,1460px);min-width:min(980px,calc(100vw - 96px));
@@ -125,7 +126,7 @@
       button{min-height:40px;padding:6px 8px;font-size:11px}
       input[type=range]{height:30px}
       .ui{
-        left:max(8px,env(safe-area-inset-left));right:max(64px,calc(env(safe-area-inset-right) + 54px));
+        left:max(8px,env(safe-area-inset-left));right:max(112px,calc(env(safe-area-inset-right) + 102px));
         top:max(8px,env(safe-area-inset-top));width:auto;
       }
       .fileRow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px;margin-bottom:5px}
@@ -147,6 +148,14 @@
       .menuBtn{
         right:max(6px,env(safe-area-inset-right));top:max(8px,env(safe-area-inset-top));
         min-width:50px;min-height:40px;padding:6px 7px;font-size:10px;
+      }
+      .fullscreenBtn{
+        display:grid;place-items:center;position:fixed;
+        right:max(62px,calc(env(safe-area-inset-right) + 56px));top:max(8px,env(safe-area-inset-top));
+        z-index:10;min-width:44px;min-height:40px;padding:6px 8px;
+        background:rgba(2,18,31,.58);border-left:1px solid rgba(255,255,255,.50);
+        color:rgba(255,255,255,.88);backdrop-filter:blur(6px);
+        box-shadow:0 12px 36px rgba(0,0,0,.24);font-size:13px;
       }
       .seekHud{
         left:max(6px,env(safe-area-inset-left));right:max(6px,env(safe-area-inset-right));
@@ -188,7 +197,7 @@
 
     @media (max-width:900px) and (pointer:coarse) and (orientation:landscape) and (max-height:600px),
            (max-width:600px) and (orientation:landscape) and (max-height:600px){
-      .ui{right:auto;width:min(610px,calc(100vw - 76px))}
+      .ui{right:auto;width:min(610px,calc(100vw - 124px))}
       .fileRow{width:min(310px,42vw);margin-bottom:3px}
       .transportBar{grid-template-columns:auto auto auto minmax(130px,1fr) minmax(130px,1fr);padding:3px 5px}
       .transportBar button,.transportBar .slider{grid-column:auto;min-height:34px}
@@ -215,6 +224,7 @@
   <div id="status" class="status">MIDIファイルを読み込むと、ノートONの瞬間に右寄りのラインへノート全体が出現し、左へ余韻として流れます。</div>
   <div class="hint">ピアノロール情報量追加版：ノート名・長さ・velocity・chを装飾HUD風に表示します。RIFF/RMID、ランニングステータス等にも少し対応。らしい。</div>
 </div>
+<button id="fullscreenBtn" class="fullscreenBtn" aria-label="全画面表示" title="全画面表示">⛶</button>
 <button id="menuBtn" class="menuBtn">☰ MENU</button>
 <div class="seekHud">
   <button id="play" class="primary playbackBtn">▷ Play</button>
@@ -318,6 +328,7 @@
   const seekTime = document.getElementById('seekTime');
   const volumeInput = document.getElementById('volume');
   const volumeText = document.getElementById('volumeText');
+  const fullscreenBtn = document.getElementById('fullscreenBtn');
   const menuBtn = document.getElementById('menuBtn');
   const settingsOverlay = document.getElementById('settingsOverlay');
   const settingsClose = document.getElementById('settingsClose');
@@ -443,17 +454,26 @@
   function setDefaultHudPanelLayout(mode){
     if(mode==='mobile-portrait'){
       const side=8;
-      const panelW=Math.max(142,Math.min(178,(W-side*3)/2));
-      const panelY=Math.max(116,H-146-96-side);
-      hudPanels.telemetry.w=panelW;hudPanels.telemetry.h=86;hudPanels.telemetry.x=side;hudPanels.telemetry.y=panelY+10;
-      hudPanels.active.w=panelW;hudPanels.active.h=96;hudPanels.active.x=W-side-panelW;hudPanels.active.y=panelY;
-      hudPanels.next.w=Math.max(168,Math.min(210,W-side*2));hudPanels.next.h=82;hudPanels.next.x=W-side-hudPanels.next.w;hudPanels.next.y=Math.min(Math.max(126,H*.17),Math.max(0,H-230));
+      hudPanels.telemetry.minW=118;hudPanels.telemetry.minH=54;
+      hudPanels.next.minW=124;hudPanels.next.minH=54;
+      hudPanels.active.minW=124;hudPanels.active.minH=58;
+      const panelW=Math.max(130,Math.min(152,(W-side*3)/2));
+      const panelY=Math.max(104,H-132-82-side);
+      hudPanels.telemetry.w=panelW;hudPanels.telemetry.h=66;hudPanels.telemetry.x=side;hudPanels.telemetry.y=panelY+6;
+      hudPanels.active.w=panelW;hudPanels.active.h=72;hudPanels.active.x=W-side-panelW;hudPanels.active.y=panelY;
+      hudPanels.next.w=Math.max(140,Math.min(168,W-side*2));hudPanels.next.h=62;hudPanels.next.x=W-side-hudPanels.next.w;hudPanels.next.y=Math.min(Math.max(104,H*.16),Math.max(0,H-204));
     }else if(mode==='mobile-landscape'){
       const side=8,bottomDock=56;
-      hudPanels.telemetry.w=Math.min(205,Math.max(170,W*.24));hudPanels.telemetry.h=80;hudPanels.telemetry.x=side;hudPanels.telemetry.y=Math.max(70,H-bottomDock-hudPanels.telemetry.h-side);
-      hudPanels.active.w=Math.min(220,Math.max(190,W*.26));hudPanels.active.h=92;hudPanels.active.x=W-side-hudPanels.active.w;hudPanels.active.y=Math.max(70,H-bottomDock-hudPanels.active.h-side);
-      hudPanels.next.w=Math.min(205,Math.max(170,W*.23));hudPanels.next.h=78;hudPanels.next.x=W-side-hudPanels.next.w;hudPanels.next.y=60;
+      hudPanels.telemetry.minW=120;hudPanels.telemetry.minH=52;
+      hudPanels.next.minW=120;hudPanels.next.minH=52;
+      hudPanels.active.minW=132;hudPanels.active.minH=56;
+      hudPanels.telemetry.w=Math.min(172,Math.max(136,W*.18));hudPanels.telemetry.h=62;hudPanels.telemetry.x=side;hudPanels.telemetry.y=Math.max(56,H-bottomDock-hudPanels.telemetry.h-side);
+      hudPanels.active.w=Math.min(180,Math.max(146,W*.19));hudPanels.active.h=68;hudPanels.active.x=W-side-hudPanels.active.w;hudPanels.active.y=Math.max(56,H-bottomDock-hudPanels.active.h-side);
+      hudPanels.next.w=Math.min(172,Math.max(136,W*.18));hudPanels.next.h=60;hudPanels.next.x=W-side-hudPanels.next.w;hudPanels.next.y=52;
     }else{
+      hudPanels.telemetry.minW=170;hudPanels.telemetry.minH=70;
+      hudPanels.next.minW=170;hudPanels.next.minH=70;
+      hudPanels.active.minW=190;hudPanels.active.minH=82;
       hudPanels.telemetry.w=250;hudPanels.telemetry.h=108;hudPanels.telemetry.x=18;hudPanels.telemetry.y=H-170;
       hudPanels.next.w=255;hudPanels.next.h=90;hudPanels.next.x=W-285;hudPanels.next.y=70;
       hudPanels.active.w=265;hudPanels.active.h=118;hudPanels.active.x=W-292;hudPanels.active.y=H-155;
@@ -478,6 +498,7 @@
     const mobile=isMobileLayout();
     const mode=currentHudLayoutMode();
     document.documentElement.dataset.layout=mode;
+    syncFullscreenButton();
     if(mode!==hudLayoutMode) hudPanelsReady=false;
     ensureHudPanelLayout();
     if(!responsiveLayoutInitialized){
@@ -485,6 +506,39 @@
       responsiveLayoutInitialized=true;
     }
   }
+  function getFullscreenElement(){
+    return document.fullscreenElement||document.webkitFullscreenElement;
+  }
+  function syncFullscreenButton(){
+    if(!fullscreenBtn) return;
+    const active=!!getFullscreenElement();
+    fullscreenBtn.style.display=isMobileLayout()?'grid':'none';
+    fullscreenBtn.textContent=active?'×':'⛶';
+    fullscreenBtn.setAttribute('aria-label',active?'全画面を終了':'全画面表示');
+    fullscreenBtn.title=active?'全画面を終了':'全画面表示';
+  }
+  async function toggleFullscreen(){
+    if(!isMobileLayout()) return;
+    try{
+      if(getFullscreenElement()){
+        if(document.exitFullscreen) await document.exitFullscreen();
+        else if(document.webkitExitFullscreen) document.webkitExitFullscreen();
+      }else{
+        const root=document.documentElement;
+        if(root.requestFullscreen) await root.requestFullscreen({navigationUI:'hide'});
+        else if(root.webkitRequestFullscreen) root.webkitRequestFullscreen();
+        else alert('このブラウザでは全画面表示を利用できません。ホーム画面に追加して開くと、表示領域を広くできる場合があります。');
+      }
+    }catch(err){
+      console.error(err);
+      alert('全画面表示を開始できませんでした。ブラウザ側の制限で使えない場合があります。');
+    }finally{
+      syncFullscreenButton();
+      requestAnimationFrame(()=>{resize();syncResponsiveLayout();});
+    }
+  }
+  document.addEventListener('fullscreenchange',()=>{syncFullscreenButton();requestAnimationFrame(()=>{resize();syncResponsiveLayout();});});
+  document.addEventListener('webkitfullscreenchange',()=>{syncFullscreenButton();requestAnimationFrame(()=>{resize();syncResponsiveLayout();});});
   addEventListener('resize',syncResponsiveLayout,{passive:true});
   mobileLayoutQuery.addEventListener?.('change',syncResponsiveLayout);
   syncResponsiveLayout();
@@ -1099,22 +1153,40 @@
   }
   function drawResizeHandle(x,y,w,h,color){
     const rgb=hexToRgb(color);
+    const grip=isMobileLayout()?11:14;
+    const inset=isMobileLayout()?3:4;
     ctx.save();
     ctx.strokeStyle=`rgba(${rgb.r},${rgb.g},${rgb.b},.50)`;ctx.lineWidth=1;
-    ctx.beginPath();ctx.moveTo(x+w-14,y+h-4);ctx.lineTo(x+w-4,y+h-4);ctx.lineTo(x+w-4,y+h-14);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(x+w-grip,y+h-inset);ctx.lineTo(x+w-inset,y+h-inset);ctx.lineTo(x+w-inset,y+h-grip);ctx.stroke();
     ctx.restore();
   }
   function drawPanel(x,y,w,h,title,lines,alpha=.70,color='#ffffff'){
     const rgb=hexToRgb(color);
+    const compact=isMobileLayout();
+    const pad=compact?8:12;
+    const titleY=compact?14:17;
+    const bodyY=compact?29:35;
+    const lineStep=compact?11:14;
+    const titleFont=compact?'700 8px ui-monospace, SFMono-Regular, Menlo, monospace':'700 10px ui-monospace, SFMono-Regular, Menlo, monospace';
+    const bodyFont=compact?'8px ui-monospace, SFMono-Regular, Menlo, monospace':'10px ui-monospace, SFMono-Regular, Menlo, monospace';
     ctx.save();ctx.fillStyle=`rgba(8,19,32,${alpha})`;ctx.strokeStyle=`rgba(${rgb.r},${rgb.g},${rgb.b},.28)`;ctx.lineWidth=1;roundRect(ctx,x,y,w,h,3);ctx.fill();ctx.stroke();
     ctx.beginPath();ctx.rect(x+1,y+1,Math.max(0,w-2),Math.max(0,h-2));ctx.clip();
-    ctx.fillStyle=`rgba(${rgb.r},${rgb.g},${rgb.b},.86)`;ctx.font='700 10px ui-monospace, SFMono-Regular, Menlo, monospace';ctx.fillText(title,x+12,y+17);
-    ctx.fillStyle=`rgba(${rgb.r},${rgb.g},${rgb.b},.72)`;ctx.font='10px ui-monospace, SFMono-Regular, Menlo, monospace';
-    lines.forEach((line,i)=>ctx.fillText(line,x+12,y+35+i*14));
+    ctx.fillStyle=`rgba(${rgb.r},${rgb.g},${rgb.b},.86)`;ctx.font=titleFont;ctx.fillText(title,x+pad,y+titleY);
+    ctx.fillStyle=`rgba(${rgb.r},${rgb.g},${rgb.b},.72)`;ctx.font=bodyFont;
+    lines.forEach((line,i)=>ctx.fillText(line,x+pad,y+bodyY+i*lineStep));
     drawResizeHandle(x,y,w,h,color);ctx.restore();
   }
   function drawActiveNotesPanel(x,y,w,h,t){
     const rgb=hexToRgb(activePanelColor);
+    const compact=isMobileLayout();
+    const pad=compact?8:12;
+    const titleY=compact?14:17;
+    const infoY=compact?29:34;
+    const emptyY=compact?47:56;
+    const rowStartY=compact?45:55;
+    const rowStep=compact?12:16;
+    const titleFont=compact?'700 8px ui-monospace, SFMono-Regular, Menlo, monospace':'700 10px ui-monospace, SFMono-Regular, Menlo, monospace';
+    const bodyFont=compact?'8px ui-monospace, SFMono-Regular, Menlo, monospace':'10px ui-monospace, SFMono-Regular, Menlo, monospace';
     const activeNotes = notes
       .filter(n => n.start <= t && n.end > t)
       .sort((a,b) => a.note - b.note);
@@ -1134,43 +1206,43 @@
     ctx.beginPath();ctx.rect(x+1,y+1,Math.max(0,w-2),Math.max(0,h-2));ctx.clip();
 
     ctx.fillStyle=`rgba(${rgb.r},${rgb.g},${rgb.b},.88)`;
-    ctx.font='700 10px ui-monospace, SFMono-Regular, Menlo, monospace';
-    ctx.fillText('ACTIVE NOTES', x+12, y+17);
+    ctx.font=titleFont;
+    ctx.fillText('ACTIVE NOTES', x+pad, y+titleY);
 
     ctx.fillStyle=`rgba(${rgb.r},${rgb.g},${rgb.b},.70)`;
-    ctx.font='10px ui-monospace, SFMono-Regular, Menlo, monospace';
-    ctx.fillText(`POLY:${String(activeNotes.length).padStart(2,'0')}  RANGE:${activeNotes.length ? noteName(activeNotes[0].note)+'-'+noteName(activeNotes[activeNotes.length-1].note) : '--'}`, x+12, y+34);
+    ctx.font=bodyFont;
+    ctx.fillText(`POLY:${String(activeNotes.length).padStart(2,'0')}  RANGE:${activeNotes.length ? noteName(activeNotes[0].note)+'-'+noteName(activeNotes[activeNotes.length-1].note) : '--'}`, x+pad, y+infoY);
 
     if(!activeNotes.length){
       ctx.fillStyle=`rgba(${rgb.r},${rgb.g},${rgb.b},.38)`;
-      ctx.fillText('no sustained signal', x+12, y+56);
+      ctx.fillText('no sustained signal', x+pad, y+emptyY);
       drawResizeHandle(x,y,w,h,activePanelColor);
       ctx.restore();
       return;
     }
 
-    let yy = y + 55;
+    let yy = y + rowStartY;
     for(const [ch, list] of byCh){
       const names = list.map(n => noteName(n.note)).join('  ');
       const avgVel = Math.round(list.reduce((a,n)=>a+n.vel,0) / list.length);
       ctx.fillStyle=`rgba(${rgb.r},${rgb.g},${rgb.b},.82)`;
-      ctx.fillText(`CH${String(ch+1).padStart(2,'0')}  V:${String(avgVel).padStart(3,'0')}`, x+12, yy);
+      ctx.fillText(`CH${String(ch+1).padStart(2,'0')}  V:${String(avgVel).padStart(3,'0')}`, x+pad, yy);
       ctx.fillStyle='rgba(255,255,255,.88)';
-      ctx.fillText(names.slice(0, 29), x+92, yy);
-      yy += 16;
-      if(yy > y+h-12) break;
+      ctx.fillText(names.slice(0, compact?16:29), x+(compact?70:92), yy);
+      yy += rowStep;
+      if(yy > y+h-(compact?9:12)) break;
     }
 
     // 右端に小さな88鍵風スケール。鳴っている音だけ点灯。
-    const stripX = x + w - 22;
-    const stripTop = y + 42;
-    const stripH = h - 56;
+    const stripX = x + w - (compact?16:22);
+    const stripTop = y + (compact?34:42);
+    const stripH = h - (compact?44:56);
     ctx.fillStyle='rgba(255,255,255,.08)';
-    ctx.fillRect(stripX, stripTop, 7, stripH);
+    ctx.fillRect(stripX, stripTop, compact?5:7, stripH);
     for(const n of activeNotes){
       const py = stripTop + stripH - ((n.note - minNote) / (maxNote - minNote || 1)) * stripH;
       ctx.fillStyle=`rgba(${rgb.r},${rgb.g},${rgb.b},.95)`;
-      ctx.fillRect(stripX-2, py-1, 11, 2);
+      ctx.fillRect(stripX-2, py-1, compact?9:11, 2);
     }
     drawResizeHandle(x,y,w,h,activePanelColor);
     ctx.restore();
@@ -1675,6 +1747,7 @@
     labelDelayText.textContent = labelDelay.toFixed(2)+'s';
     labelCutText.textContent = Math.round(labelCutRatio*100)+'%';
   }
+  fullscreenBtn.onclick=toggleFullscreen;
   menuBtn.onclick=()=>{settingsOverlay.style.display='block';};
   settingsClose.onclick=()=>{settingsOverlay.style.display='none';};
   offlineExportStart.onclick=startOfflineExport;
